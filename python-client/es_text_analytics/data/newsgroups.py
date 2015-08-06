@@ -5,7 +5,7 @@ import tarfile
 
 from elasticsearch.client.indices import IndicesClient
 
-from es_text_analytics.data.dataset import download_dataset, default_dataset_path
+from es_text_analytics.data.dataset import download_file, default_dataset_path
 
 """
 The 20 Newsgroups dataset is a standardized dataset with Newsgroup messages.
@@ -66,7 +66,7 @@ def parse(msg):
     return doc
 
 
-class NewsgroupsDataset():
+class NewsgroupsDataset:
     """
     Class encapsulating the Newsgroups dataset and the information needed to retrieve and index it.
 
@@ -104,7 +104,7 @@ class NewsgroupsDataset():
         :rtype : None
         """
         self.delete_index()
-        self.dataset_fn = download_dataset(NEWSGROUPS_ARCHIVE_URL, dataset_path=self.dataset_path)
+        self.dataset_fn = download_file(NEWSGROUPS_ARCHIVE_URL, dest_path=self.dataset_path)
         self.index()
 
     def index(self):

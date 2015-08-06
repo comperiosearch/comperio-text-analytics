@@ -19,39 +19,42 @@ def fn_from_url(url):
     return os.path.basename(parse.path)
 
 
-def download_dataset(url, dataset_path=None):
+def download_file(url, dest_path):
     """
-    Download the dataset pointed to by the url to the dataset path specified or the defult dataset location.
-    If the dataset is already present at the dataset path it will not be downloaded and the path to this dataset
+    Download the file pointed to by the url to the path specified or the defult dataset location.
+    If the dfile is already present at the path it will not be downloaded and the path to this file
     is returned.
 
-    :param url: url string pointing to the dataset
+    :param url: url string pointing to the file
     :type url : str|unicode
-    :param dataset_path: path to location where the dataset will be stored locally
-    :type dataset_path : str|unicode
+    :param dest_path: path to location where the file will be stored locally
+    :type dest_path : str|unicode
     :rtype : str|unicode
     :return: path to the downloaded dataset
     """
-    if not dataset_path:
-        dataset_path = default_dataset_path()
+    if not os.path.exists(dest_path):
+        os.makedirs(dest_path)
 
-    if not os.path.exists(dataset_path):
-        os.makedirs(dataset_path)
+    fn = fn_from_url(url)
+    full_fn = os.path.join(dest_path, fn)
 
-    dataset_fn = fn_from_url(url)
-    dataset_full_fn = os.path.join(dataset_path, dataset_fn)
-
-    if os.path.exists(dataset_full_fn):
-        logging.info('Dataset archive %s already exists in %s ...' % (dataset_fn, dataset_path))
+    if os.path.exists(full_fn):
+        logging.info('Dataset archive %s already exists in %s ...' % (fn, dest_path))
     else:
         r = requests.get(url, stream=True)
-        with open(dataset_full_fn, 'wb') as f:
+        with open(full_fn, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
                 if chunk: # filter out keep-alive new chunks
                     f.write(chunk)
                     f.flush()
 
-    return dataset_full_fn
+    return full_fn
+
+
+def project_path():
+    self_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.abspath(os.path.join(self_path, '..', '..', '..'))
 
 
 def default_dataset_path():
@@ -61,7 +64,4 @@ def default_dataset_path():
     :rtype : str|unicode
     :return: the path to the default dataset location
     """
-    self_path = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.abspath(os.path.join(self_path, '..', '..', '..', 'data'))
-
-    return dataset_path
+    return os.path.join(project_path(), 'data')
