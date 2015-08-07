@@ -4,7 +4,7 @@ from unittest import TestCase
 from pandas import json
 import requests
 
-from es_text_analytics.elasticsearch_runner import ElasticsearchRunner, process_exists
+from elasticsearch_runner.elasticsearch_runner import ElasticsearchRunner, process_exists
 
 
 class TestElasticsearchRunner(TestCase):
