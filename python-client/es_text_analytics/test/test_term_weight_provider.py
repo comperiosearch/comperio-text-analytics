@@ -1,0 +1,224 @@
+from unittest import TestCase
+
+from elasticsearch.client import Elasticsearch, IndicesClient
+
+from es_text_analytics.term_weight_provider import SimpleTermWeightProvider, ESTermWeightProvider
+from es_text_analytics.test import es_runner
+
+
+class TestSimpleTermWeightProvider(TestCase):
+    def test_getitem_single(self):
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)])
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(.5, w)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(.25, w)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(.125, w)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(.125, w)
+
+    def test_inverse(self):
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)],
+                                            inverse=True)
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(2., w)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(4., w)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(8., w)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(8., w)
+
+    def test_sublinear(self):
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)],
+                                            sublinear=True)
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(-0.693147, w, places=4)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(-1.386294, w, places=4)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(-2.079442, w, places=4)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(-2.079442, w, places=4)
+
+    def test_inverse_sublinear(self):
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)],
+                                            sublinear=True, inverse=True)
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(0.693147, w, places=4)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(1.386294, w, places=4)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(2.079442, w, places=4)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(2.079442, w, places=4)
+
+    def test_getitem_multiple(self):
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)])
+
+        weights = dict(provider[['ba', 'foo', 'knark', 'knirk']])
+        self.assertEqual(['ba', 'foo', 'knark', 'knirk'], sorted(weights.keys()))
+        self.assertAlmostEqual(weights['ba'], .5)
+        self.assertAlmostEqual(weights['knark'], .25)
+        self.assertAlmostEqual(weights['knirk'], .125)
+        self.assertAlmostEqual(weights['foo'], .125)
+
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)])
+
+        weights = dict(provider['ba', 'foo', 'knark', 'knirk'])
+        self.assertEqual(['ba', 'foo', 'knark', 'knirk'], sorted(weights.keys()))
+        self.assertAlmostEqual(weights['ba'], .5)
+        self.assertAlmostEqual(weights['knark'], .25)
+        self.assertAlmostEqual(weights['knirk'], .125)
+        self.assertAlmostEqual(weights['foo'], .125)
+
+    def test_getitem_missing(self):
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)])
+
+        self.assertRaises(KeyError, lambda: provider['notfound'])
+        self.assertEqual([('ba', .5)], list(provider['ba', 'notfound']))
+
+
+class TestESTermWeightProvider(TestCase):
+
+    def setUp(self):
+        super(TestESTermWeightProvider, self).setUp()
+
+        self.es = Elasticsearch(hosts=['localhost:%d' % es_runner.es_state.port])
+        self.ic = IndicesClient(self.es)
+        self.index = 'es_term_weight_provider_test'
+        self.doc_type = 'test-doc'
+        self.field = 'text'
+
+        if self.ic.exists(self.index):
+            self.ic.delete(self.index)
+
+        self.ic.create(self.index)
+        self.es.create(self.index, self.doc_type, {self.field: 'foo'})
+        self.es.create(self.index, self.doc_type, {self.field: 'knark'})
+        self.es.create(self.index, self.doc_type, {self.field: 'ba'})
+        self.es.create(self.index, self.doc_type, {self.field: 'knirk'})
+        self.es.create(self.index, self.doc_type, {self.field: 'ba'})
+        self.es.create(self.index, self.doc_type, {self.field: 'ba'})
+        self.es.create(self.index, self.doc_type, {self.field: 'knark '})
+        self.es.create(self.index, self.doc_type, {self.field: 'ba'}, refresh=True)
+
+    def tearDown(self):
+        super(TestESTermWeightProvider, self).tearDown()
+
+        self.ic.delete(self.index)
+
+
+    def test_getitem_single(self):
+        provider = ESTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+                                        inverse=False, sublinear=False)
+
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(.5, w)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(.25, w)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(.125, w)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(.125, w)
+
+    def test_inverse(self):
+        provider = ESTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+                                        inverse=True, sublinear=False)
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(2., w)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(4., w)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(8., w)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(8., w)
+
+    def test_sublinear(self):
+        provider = ESTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+                                        inverse=False, sublinear=True)
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(-0.693147, w, places=4)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(-1.386294, w, places=4)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(-2.079442, w, places=4)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(-2.079442, w, places=4)
+
+    def test_inverse_sublinear(self):
+        provider = ESTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+                                        inverse=True, sublinear=True)
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(0.693147, w, places=4)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(1.386294, w, places=4)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(2.079442, w, places=4)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(2.079442, w, places=4)
+
+    def test_getitem_multiple(self):
+        provider = ESTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+                                        inverse=False, sublinear=False)
+
+        weights = dict(provider[['ba', 'foo', 'knark', 'knirk']])
+        self.assertEqual(['ba', 'foo', 'knark', 'knirk'], sorted(weights.keys()))
+        self.assertAlmostEqual(weights['ba'], .5)
+        self.assertAlmostEqual(weights['knark'], .25)
+        self.assertAlmostEqual(weights['knirk'], .125)
+        self.assertAlmostEqual(weights['foo'], .125)
+
+        weights = dict(provider['ba', 'foo', 'knark', 'knirk'])
+        self.assertEqual(['ba', 'foo', 'knark', 'knirk'], sorted(weights.keys()))
+        self.assertAlmostEqual(weights['ba'], .5)
+        self.assertAlmostEqual(weights['knark'], .25)
+        self.assertAlmostEqual(weights['knirk'], .125)
+        self.assertAlmostEqual(weights['foo'], .125)
+
+    def test_getitem_missing(self):
+        provider = ESTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+                                        inverse=False, sublinear=False)
+
+        self.assertRaises(KeyError, lambda: provider['notfound'])
+        self.assertEqual([('ba', .5)], list(provider['ba', 'notfound']))
