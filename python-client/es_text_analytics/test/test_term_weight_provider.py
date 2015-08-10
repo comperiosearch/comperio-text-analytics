@@ -100,7 +100,12 @@ class TestSimpleTermWeightProvider(TestCase):
                                              ('knirk', 1), ('ba', 1), ('knark', 1)])
 
         self.assertRaises(KeyError, lambda: provider['notfound'])
+        self.assertRaises(KeyError, lambda: provider['ba', 'notfound'])
+
+        provider = SimpleTermWeightProvider([('ba', 2), ('foo', 1), ('ba', 1), ('knark', 1),
+                                             ('knirk', 1), ('ba', 1), ('knark', 1)], missing='ignore')
         self.assertEqual([('ba', .5)], list(provider['ba', 'notfound']))
+        self.assertIsNone(provider['notfound'])
 
 
 class TestESTermWeightProvider(TestCase):
@@ -221,4 +226,10 @@ class TestESTermWeightProvider(TestCase):
                                         inverse=False, sublinear=False)
 
         self.assertRaises(KeyError, lambda: provider['notfound'])
+        self.assertRaises(KeyError, lambda: provider['ba', 'notfound'])
+
+        provider = ESTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+                                        inverse=False, sublinear=False, missing='ignore')
+
+        self.assertIsNone(provider['notfound'])
         self.assertEqual([('ba', .5)], list(provider['ba', 'notfound']))
