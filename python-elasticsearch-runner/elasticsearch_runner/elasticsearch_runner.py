@@ -144,7 +144,7 @@ class ElasticsearchRunner:
                 z.extractall(self.install_path)
 
         # install custom configuration file
-        copyfile(os.path.join(project_path(), 'python-client', 'resources', 'embedded_elasticsearch.yml'),
+        copyfile(os.path.join(project_path(), 'python-elasticsearch-runner', 'resources', 'embedded_elasticsearch.yml'),
                  os.path.join(self.install_path, 'elasticsearch-1.7.1', 'config', 'elasticsearch.yml'))
 
         return self
