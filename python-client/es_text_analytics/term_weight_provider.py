@@ -2,6 +2,9 @@ from abc import ABCMeta, abstractmethod
 from math import log
 import re
 
+from gensim.corpora import Dictionary
+from gensim.models import TfidfModel
+
 
 class TermWeightingProvider:
     """
@@ -110,11 +113,13 @@ class TermWeightingProvider:
         raise NotImplementedError
 
 
-def weight_map_from_term_counts(term_count_iter):
+def weight_map_from_term_counts(term_count_iter, min_count=1):
     """
     Create a map of terms and their frequencies from a list of terms and counts.
 
     :param term_count_iter: An iterator with tuples of terms and counts, ie, (term, count).
+    :param min_count: Minimum count value that will be added to the weight map:
+    :type min_count: int|long
     :rtype : dict
     :return: A dict with the terms as keys and the frequency ratios as values.
     """
@@ -123,7 +128,9 @@ def weight_map_from_term_counts(term_count_iter):
 
     for term, count in term_count_iter:
         total += count
-        weight_map[term] = weight_map.get(term, 0) + count
+
+        if count >= min_count:
+            weight_map[term] = weight_map.get(term, 0) + count
 
     for term in weight_map.keys():
         w = weight_map[term] / float(total)
@@ -131,6 +138,46 @@ def weight_map_from_term_counts(term_count_iter):
         weight_map[term] = w
 
     return weight_map
+
+
+def term_counts_line_parser(line, delim='\t', term_index=1, count_index=2):
+    """
+    Parses a line from a file with terms and counts as line items.
+
+    The defaults f.ex. parses "34\tba\t45\n" into ('ba', 45)
+
+    :param line:
+    :type line: unicode|str
+    :param delim: Character used to split tokens.
+    :type delim: unicode|str
+    :param term_index: Token index for the term element.
+    :type term_index: int|long
+    :param count_index: Token index for the count element.
+    :type count_index: int|long
+    :rtype : (unicode|str, int|long)
+    :return: Tuple with the term and count from the passed line string.
+    """
+    tokens = line.split(delim)
+
+    return tokens[term_index], int(tokens[count_index])
+
+
+def term_counts_iter_from_file(f, line_parser=None):
+    """
+    Reads term counts from a file with term/count pairs as line items.
+
+    :param f: A FileIO instance
+    :type f: FileIO
+    :param line_parser: Function that parses a line into a term, count tuple. Default parses Gensim Dictionary
+        text format.
+    :type line_parser: function
+    :rtype : generator
+    """
+    if not line_parser:
+        line_parser = term_counts_line_parser
+
+    for line in f:
+        yield line_parser(line)
 
 
 class SimpleTermWeightProvider(TermWeightingProvider):
@@ -179,3 +226,14 @@ class ESTermWeightProvider(TermWeightingProvider):
             raise RuntimeError
 
         return dict(tf)
+
+
+class GensimIDFProvider(TermWeightingProvider):
+    def __init__(self, dictionary, **kwargs):
+        super(GensimIDFProvider, self).__init__(**kwargs)
+
+        if isinstance(dictionary, (str, unicode)):
+            dictionary = Dictionary.load(dictionary)
+        self.dictionary = dictionary
+        self.tfidf = TfidfModel(dictionary=dictionary, normalize=False)
+

@@ -1,9 +1,29 @@
+from StringIO import StringIO
 from unittest import TestCase
 
 from elasticsearch.client import Elasticsearch, IndicesClient
 
-from es_text_analytics.term_weight_provider import SimpleTermWeightProvider, ESTermWeightProvider
+from es_text_analytics.term_weight_provider import SimpleTermWeightProvider, ESTermWeightProvider, \
+    weight_map_from_term_counts, term_counts_line_parser, term_counts_iter_from_file
 from es_text_analytics.test import es_runner
+
+
+class TestTermWeightProviderHelpers(TestCase):
+    def test_weight_map_from_term_counts(self):
+        wm = sorted(weight_map_from_term_counts([('foo', 2), ('ba', 1), ('knark', 4), ('knirk', 1)]).items())
+        self.assertEqual(wm, [('ba', 0.125), ('foo', 0.25), ('knark', 0.5), ('knirk', 0.125)])
+
+        wm = sorted(weight_map_from_term_counts([('foo', 2), ('ba', 1), ('knark', 4), ('knirk', 1)], min_count=4).items())
+        self.assertEqual(wm, [('knark', .5)])
+
+    def test_term_counts_line_parser(self):
+        self.assertEqual(('absolutely', 342), term_counts_line_parser('5949\tabsolutely\t342\n'))
+        self.assertEqual(('finished', 136), term_counts_line_parser('497\tfinished\t136'))
+
+    def test_term_counts_iter_from_file(self):
+        f = StringIO('5949\tabsolutely\t342\n497\tfinished\t136')
+
+        self.assertEqual([('absolutely', 342), ('finished', 136)], list(term_counts_iter_from_file(f)))
 
 
 class TestSimpleTermWeightProvider(TestCase):
