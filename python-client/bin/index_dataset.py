@@ -23,7 +23,7 @@ def main():
     es_hosts = [opts.elasticsearch_server]
     dataset_name = opts.dataset
 
-    es = Elasticsearch(hosts=es_hosts)
+    es = Elasticsearch(hosts=es_hosts, timeout=120)
 
     if dataset_name == 'newsgroups':
         dataset = NewsgroupsDataset(es)
