@@ -66,6 +66,30 @@ def parse(msg):
     return doc
 
 
+def newsgroups_iterator(dataset_fn):
+    """
+    Provides an iterator of parsed documents from the 20 Newsgroups dataset.
+
+    :param dataset_fn: Path to Newsgroups dataset archive file.
+    :type dataset_fn: unicode|str
+    :rtype : generator
+    """
+    with tarfile.open(dataset_fn, 'r:gz') as f:
+        for member in f:
+            if member.isfile():
+                _, group, doc_id = member.path.split('/')
+
+                m_f = f.extractfile(member)
+                # extract content and remove unprintable characteres such as ascii control sequences
+                # TODO regex is probably more efficient than filter
+                msg = filter(string.printable.__contains__, m_f.read())
+                m_f.close()
+
+                doc = parse(msg)
+
+                yield doc
+
+
 class NewsgroupsDataset:
     """
     Class encapsulating the Newsgroups dataset and the information needed to retrieve and index it.
@@ -120,26 +144,14 @@ class NewsgroupsDataset:
         docs = []
         count = 0
 
-        with tarfile.open(self.dataset_fn, 'r:gz') as f:
-            for member in f:
-                if member.isfile():
-                    _, group, doc_id = member.path.split('/')
+        for doc in newsgroups_iterator(self.dataset_fn):
+            docs += [{'index': {'_index': self.es_index, '_type': self.es_doc_type}}, doc]
+            count += 1
 
-                    m_f = f.extractfile(member)
-                    # extract content and remove unprintable characteres such as ascii control sequences
-                    # TODO regex is probablt more efficient than filter
-                    msg = filter(string.printable.__contains__, m_f.read())
-                    m_f.close()
-
-                    doc = parse(msg)
-
-                    docs += [{'index': {'_index': self.es_index, '_type': self.es_doc_type}}, doc]
-                    count += 1
-
-                    if len(docs) % (2 * BULK_REQUEST_SIZE) == 0:
-                        self.es.bulk(index=self.es_index, doc_type=self.es_doc_type, body=docs)
-                        logging.info('Added %d documents ...' % count)
-                        docs = []
+            if len(docs) % (2 * BULK_REQUEST_SIZE) == 0:
+                self.es.bulk(index=self.es_index, doc_type=self.es_doc_type, body=docs)
+                logging.info('Added %d documents ...' % count)
+                docs = []
 
         if docs:
             self.es.bulk(index=self.index, doc_type=self.es_doc_type, body=docs)
