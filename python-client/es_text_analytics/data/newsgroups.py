@@ -66,7 +66,7 @@ def parse(msg):
     return doc
 
 
-def newsgroups_iterator(dataset_fn):
+def iterator(dataset_fn):
     """
     Provides an iterator of parsed documents from the 20 Newsgroups dataset.
 
@@ -144,7 +144,7 @@ class NewsgroupsDataset:
         docs = []
         count = 0
 
-        for doc in newsgroups_iterator(self.dataset_fn):
+        for doc in iterator(self.dataset_fn):
             docs += [{'index': {'_index': self.es_index, '_type': self.es_doc_type}}, doc]
             count += 1
 
