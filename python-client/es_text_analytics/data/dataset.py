@@ -1,8 +1,14 @@
+from abc import abstractmethod
+from abc import ABCMeta
 import logging
 import os
 from urlparse import urlparse
 
+from elasticsearch.client import IndicesClient
+
 import requests
+
+BULK_REQUEST_SIZE = 100
 
 
 def fn_from_url(url):
@@ -52,6 +58,12 @@ def download_file(url, dest_path):
 
 
 def project_path():
+    """
+    Returns the path to the root project directory.
+
+    :rtype : str|unicode
+    :return: The root project path as a string.
+    """
     self_path = os.path.dirname(os.path.abspath(__file__))
 
     return os.path.abspath(os.path.join(self_path, '..', '..', '..'))
@@ -65,3 +77,113 @@ def default_dataset_path():
     :return: the path to the default dataset location
     """
     return os.path.join(project_path(), 'data')
+
+
+class Dataset:
+    """
+    Base class for self-installable and self-indexable datasets.
+
+    Contains base methods for downloading the dataset and creating Elasticsearch index based on it.
+    """
+    __metaclass__ = ABCMeta
+
+    def __init__(self, index=None, doc_type=None, dataset_path=None):
+        """
+        Initialize the instance with optional Elasticsearch index information.
+
+        :param index: Elasticsearch index where the dataset will be stored if indexed.
+        :type index: str|unicode
+        :param doc_type:
+        :type doc_type: str|unicode
+        :param dataset_path: location where dataset wiil be downloaded. If None the default location is used.
+        :type dataset_path: None|str|unicode
+        """
+        self.es_index = index
+        self.es_doc_type = doc_type
+        self.dataset_fn = None
+        self.archive_fn = None
+        self.normalize_func = None
+
+        if not dataset_path:
+            self.dataset_path = default_dataset_path()
+        else:
+            pass
+
+    @abstractmethod
+    def _iterator(self):
+        """
+        Subclasses should implement this method returning a generator yielding
+        dicts with the document data.
+        """
+        raise NotImplementedError
+
+    def __iter__(self):
+        if not self.dataset_fn:
+            raise ValueError
+
+        for doc in self._iterator():
+            try:
+                if self.normalize_func:
+                    doc = self.normalize_func(doc)
+            except Exception:
+                logging.error('Unable to normalize doc ...')
+
+            yield doc
+
+    def index(self, es):
+        """
+        Index the dataset in the given index with archive in the dataset location.
+
+        :param es: Elasticsearch client instance
+        :type es: elasticsearch.client.Elasticsearch
+        :rtype : elasticsearch.client.Elasticsearch
+        :return: :raise ValueError:
+        """
+        docs = []
+        count = 0
+
+        for doc in self:
+            docs += [{'index': {'_index': self.es_index, '_type': self.es_doc_type}}, doc]
+            count += 1
+
+            if len(docs) % (2 * BULK_REQUEST_SIZE) == 0:
+                es.bulk(index=self.es_index, doc_type=self.es_doc_type, body=docs)
+                logging.info('Added %d documents ...' % count)
+                docs = []
+
+        if docs:
+            es.bulk(index=self.index, doc_type=self.es_doc_type, body=docs)
+            logging.info('Added %d documents ...' % count)
+
+        return self
+
+    def delete_index(self, es):
+        """
+        Delete the dataset index.
+
+        :param es: Elasticsearch client instance
+        :type es: elasticsearch.client.Elasticsearch
+        :rtype : NewsgroupsDataset
+        """
+        ic = IndicesClient(es)
+        ic.delete(index=self.es_index, ignore=[400, 404])
+
+        return self
+
+    def install(self, es=None):
+        """
+        Install and optionally index the dataset.
+        WARNING: Deletes the index before installing.
+
+        :param es: Pass an Elasticsearch client instance to index the dataset.
+        :type es: None|elasticsearch.client.Elasticsearch
+        :rtype : Dataset
+        """
+        self.dataset_fn = download_file(self.archive_fn, dest_path=self.dataset_path)
+
+        if es:
+            logging.info("Creating Elasticsearch index %s ..." % self.index)
+            self.delete_index(es)
+            self.index(es)
+
+        return self

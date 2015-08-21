@@ -1,11 +1,8 @@
-import logging
 import re
 import string
 import tarfile
 
-from elasticsearch.client.indices import IndicesClient
-
-from es_text_analytics.data.dataset import download_file, default_dataset_path
+from es_text_analytics.data.dataset import Dataset
 
 """
 The 20 Newsgroups dataset is a standardized dataset with Newsgroup messages.
@@ -14,7 +11,6 @@ http://qwone.com/~jason/20Newsgroups/
 """
 
 NEWSGROUPS_ARCHIVE_URL = 'http://qwone.com/~jason/20Newsgroups/20news-18828.tar.gz'
-BULK_REQUEST_SIZE = 100
 
 
 def match_header_line(line):
@@ -90,80 +86,17 @@ def iterator(dataset_fn):
                 yield doc
 
 
-class NewsgroupsDataset:
+class NewsgroupsDataset(Dataset):
     """
     Class encapsulating the Newsgroups dataset and the information needed to retrieve and index it.
 
     Currently only downloads and index the dataset in Elasticsearch.
     """
 
-    def __init__(self, es, index='newsgroups', doc_type='message', dataset_path=None):
-        """
-        Initialize the instance with Elasticsearch server and index information.
+    def __init__(self, index='newsgroups', doc_type='message', dataset_path=None):
+        super(NewsgroupsDataset, self).__init__(index=index, doc_type=doc_type, dataset_path=dataset_path)
 
-        :param es: Elasticsearch client instance
-        :type es: elasticsearch.client.Elasticsearch
-        :param index: Elasticsearch index where the dataset will be stored
-        :type index: str|unicode
-        :param doc_type:
-        :type doc_type: str|unicode
-        :param dataset_path: location where dataset wiil be downloaded. If None the default location is used.
-        :type dataset_path: None|str|unicode
-        """
-        self.es = es
-        self.es_index = index
-        self.es_doc_type = doc_type
-        self.dataset_fn = None
+        self.archive_fn = NEWSGROUPS_ARCHIVE_URL
 
-        if not dataset_path:
-            self.dataset_path = default_dataset_path()
-        else:
-            self.dataset_path = dataset_path
-
-    def install(self):
-        """
-        Install and index the dataset.
-        WARNING: Deletes the index before installing.
-
-        :rtype : None
-        """
-        self.delete_index()
-        self.dataset_fn = download_file(NEWSGROUPS_ARCHIVE_URL, dest_path=self.dataset_path)
-        self.index()
-
-    def index(self):
-        """
-        Index the dataset in the given index with archive in the dataset location.
-
-        :rtype : elasticsearch.client.Elasticsearch
-        :return: :raise ValueError:
-        """
-        if not self.dataset_fn:
-            raise ValueError
-
-        docs = []
-        count = 0
-
-        for doc in iterator(self.dataset_fn):
-            docs += [{'index': {'_index': self.es_index, '_type': self.es_doc_type}}, doc]
-            count += 1
-
-            if len(docs) % (2 * BULK_REQUEST_SIZE) == 0:
-                self.es.bulk(index=self.es_index, doc_type=self.es_doc_type, body=docs)
-                logging.info('Added %d documents ...' % count)
-                docs = []
-
-        if docs:
-            self.es.bulk(index=self.index, doc_type=self.es_doc_type, body=docs)
-            logging.info('Added %d documents ...' % count)
-
-        return self.es
-
-    def delete_index(self):
-        """
-        Delete the dataset index.
-
-        :rtype : None
-        """
-        ic = IndicesClient(self.es)
-        ic.delete(index=self.es_index, ignore=[400, 404])
+    def _iterator(self):
+        return iterator(self.dataset_fn)
