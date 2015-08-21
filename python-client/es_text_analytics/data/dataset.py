@@ -10,6 +10,9 @@ import requests
 
 BULK_REQUEST_SIZE = 100
 
+CONLL_U_FIELDS = ['index', 'form', 'lemma', 'cpostag', 'postag', 'feats',
+                  'head', 'deprel', 'deps', 'misc']
+
 
 def fn_from_url(url):
     """
@@ -77,6 +80,37 @@ def default_dataset_path():
     :return: the path to the default dataset location
     """
     return os.path.join(project_path(), 'data')
+
+
+def parse_conll(fileobj):
+    """
+    Parse a CONLL formatted dependency treebank file. Supports the CONLL-U format
+    with UTF-8 encoding.
+
+    :param fileobj: A file like instance with CONLL formatted text.
+    :rtype : generator
+    """
+    sentence = []
+
+    for line in fileobj:
+        line = line.decode('utf-8')
+        line = line.strip()
+
+        if line == '':
+            if sentence:
+                yield sentence
+
+            sentence = []
+
+            continue
+
+        row = line.split(u'\t')
+        row[0] = int(row[0])
+
+        sentence.append(row)
+
+    if sentence:
+        yield sentence
 
 
 class Dataset:
@@ -152,7 +186,7 @@ class Dataset:
                 docs = []
 
         if docs:
-            es.bulk(index=self.index, doc_type=self.es_doc_type, body=docs)
+            es.bulk(index=self.es_index, doc_type=self.es_doc_type, body=docs)
             logging.info('Added %d documents ...' % count)
 
         return self

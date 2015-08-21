@@ -5,6 +5,7 @@ import sys
 from elasticsearch.client import Elasticsearch
 
 from es_text_analytics.data.aviskorpus import AviskorpusDataset
+from es_text_analytics.data.ndt_dataset import NDTDataset
 from es_text_analytics.data.newsgroups import NewsgroupsDataset
 
 """
@@ -13,6 +14,7 @@ Script for retrieving and indexing datasets.
 Current datasets supported:
 - 20 Newsgroups (newsgroups)
 - Norsk Aviskorpus (aviskorpus), sections and sources can be specified with f.ex. -s 1|2-aa|vg|db
+- Norwegian Dependency Treebank (ndt), sections and languages can be specified with f.ex -s newspaper|blog-nob
 """
 
 
@@ -31,7 +33,7 @@ def main():
 
     if dataset_name == 'newsgroups':
         dataset = NewsgroupsDataset()
-    if dataset_name == 'aviskorpus':
+    elif dataset_name == 'aviskorpus':
         sections = None
         sources = None
 
@@ -45,6 +47,20 @@ def main():
                 sys.exit(1)
 
         dataset = AviskorpusDataset(sections=sections, sources=sources)
+    elif dataset_name == 'ndt':
+        sections = None
+        lang = None
+
+        if dataset_sections:
+            try:
+                sections, lang = dataset_sections.split('-')
+                sections = [int(s) for s in sections.split('|')]
+                lang = [s for s in lang.split('|')]
+            except Exception:
+                logging.error('Malformed section specification "%s" ...' % dataset_sections)
+                sys.exit(1)
+
+        dataset = NDTDataset(lang=lang, sections=sections)
     else:
         logging.error('Unknown dataset %s ...' % dataset_name)
         sys.exit(1)
