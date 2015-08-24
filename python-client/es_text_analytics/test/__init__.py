@@ -1,4 +1,4 @@
-from elasticsearch_runner.elasticsearch_runner import ElasticsearchRunner
+from elasticsearch_runner.runner import ElasticsearchRunner
 
 es_runner = ElasticsearchRunner()
 
