@@ -1,13 +1,15 @@
 from collections import namedtuple
+import json
 import logging
 import os
 import re
 from shutil import copyfile
-from time import sleep
+from time import sleep, clock
 from zipfile import ZipFile
 from subprocess import Popen
 
 from psutil import Process, NoSuchProcess
+import requests
 
 from es_text_analytics.data.dataset import project_path, download_file
 
@@ -228,3 +230,33 @@ class ElasticsearchRunner:
         state = self.es_state
 
         return state and process_exists(state.server_pid)
+
+    def wait_for_green(self, timeout=1.):
+        """
+        Check if cluster status is green and wait for it to become green if it's not.
+        Run after starting the runner to ensure that the Elasticsearch instance is ready.
+
+        :param timeout: The time to wait for green cluster response in seconds.
+        :type timeout: int|long|float
+        :rtype : ElasticsearchRunner
+        :return:
+        """
+        if not self.es_state:
+            logging.warn('Elasticsearch runner is not started ...')
+            return self
+
+        end_time = clock() + timeout
+        health_resp = requests.get('http://localhost:%d/_cluster/health' % self.es_state.port)
+        health_data = json.loads(health_resp.text)
+
+        while health_data['status'] != 'green':
+            if clock() > end_time:
+                logging.error('Elasticsearch cluster failed to turn green in %f seconds, current status is %s ...' %
+                              (timeout, health_data['status']))
+
+                return self
+
+            health_resp = requests.get('http://localhost:%d/_cluster/health' % self.es_state.port)
+            health_data = json.loads(health_resp.text)
+
+        return self

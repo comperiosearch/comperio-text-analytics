@@ -23,8 +23,10 @@ class TestElasticsearchRunner(TestCase):
         self.runner = ElasticsearchRunner()
         self.runner.install()
         self.runner.run()
+        self.runner.wait_for_green()
 
         self.assertTrue(self.runner.is_running())
+
         health_resp = requests.get('http://localhost:%d/_cluster/health' % self.runner.es_state.port)
         self.assertEqual(200, health_resp.status_code)
         health_data = json.loads(health_resp.text)
@@ -38,7 +40,7 @@ class TestElasticsearchRunner(TestCase):
         self.assertFalse(self.runner.is_running())
         self.assertIsNone(self.runner.es_state)
 
-    def test__es_wrapper_fn(self):
+    def test_es_wrapper_fn(self):
         runner = ElasticsearchRunner(install_path='fakepath')
 
         self.assertEqual(runner._es_wrapper_fn('nt'),

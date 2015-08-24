@@ -6,6 +6,7 @@ es_runner = ElasticsearchRunner()
 def setup():
     es_runner.install()
     es_runner.run()
+    es_runner.wait_for_green()
 
 
 def teardown():
