@@ -3,13 +3,16 @@ import json
 import logging
 import os
 import re
-from shutil import copyfile
+from shutil import copyfile, rmtree
+from tempfile import mkdtemp
 from time import sleep, clock
 from zipfile import ZipFile
 from subprocess import Popen
 
 from psutil import Process, NoSuchProcess
 import requests
+
+from elasticsearch_runner.configuration import serialize_config, generate_config, generate_cluster_name
 
 from es_text_analytics.data.dataset import project_path, download_file
 
@@ -106,13 +109,14 @@ def parse_es_log_header(log_file, limit=200):
 
 
 # tuple holding information about the current Elasticsearch process
-ElasticsearchState = namedtuple('ElasticsearchState', 'server_pid wrapper_pid port')
+ElasticsearchState = namedtuple('ElasticsearchState', 'server_pid wrapper_pid port config_fn')
 
 
 class ElasticsearchRunner:
     """
     Runs a basic single node Elasticsearch instance for testing or other lightweight purposes.
     """
+
     def __init__(self, install_path=None, transient=False):
         """
         :param install_path: The path where the Elasticsearch software package and data storage will be kept.
@@ -127,6 +131,7 @@ class ElasticsearchRunner:
 
         self.transient = transient
         self.es_state = None
+        self.es_config = None
 
         if not check_java():
             logging.error('Java not installed. Elasticsearch won\'t be able to run ...')
@@ -145,7 +150,7 @@ class ElasticsearchRunner:
             with ZipFile(es_archive_fn, "r") as z:
                 z.extractall(self.install_path)
 
-        # install custom configuration file
+        # insert basic config file
         copyfile(os.path.join(project_path(), 'python-elasticsearch-runner', 'resources', 'embedded_elasticsearch.yml'),
                  os.path.join(self.install_path, 'elasticsearch-1.7.1', 'config', 'elasticsearch.yml'))
 
@@ -161,15 +166,27 @@ class ElasticsearchRunner:
         if self.is_running():
             logging.warn('Elasticsearch already running ...')
         else:
-            # create the log fil if it doesn't exist yet. We need to open it and seek to to the end before
+            # generate and insert Elasticsearch configuration file with transient data and log paths
+            cluster_name = generate_cluster_name()
+            log_path = mkdtemp(prefix='%s-log' % cluster_name, dir=self.install_path)
+            data_path = mkdtemp(prefix='%s-data' % cluster_name, dir=self.install_path)
+
+            self.es_config = generate_config(cluster_name=cluster_name, log_path=log_path, data_path=data_path)
+            config_fn = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'config',
+                                     'elasticsearch-%s.yml' % cluster_name)
+
+            with open(config_fn, 'w') as f:
+                serialize_config(f, self.es_config)
+
+            # create the log file if it doesn't exist yet. We need to open it and seek to to the end before
             # sniffing out the configuration info from the log.
-            # Note the default log filename which will only match the default configuration.
-            es_log_fn = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'logs', 'elasticsearch.log')
+            es_log_fn = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'logs',
+                                     '%s.log' % cluster_name)
             open(es_log_fn, 'a').close()
             es_log_f = open(es_log_fn, 'r')
             es_log_f.seek(0, 2)
 
-            wrapper_proc = Popen([(self._es_wrapper_fn(os.name))], shell=True)
+            wrapper_proc = Popen([self._es_wrapper_fn(os.name), '-Des.config=%s' % config_fn], shell=True)
 
             # watch the log
             server_pid, es_port = parse_es_log_header(es_log_f)
@@ -182,7 +199,8 @@ class ElasticsearchRunner:
 
             self.es_state = ElasticsearchState(wrapper_pid=wrapper_proc.pid,
                                                server_pid=server_pid,
-                                               port=es_port)
+                                               port=es_port,
+                                               config_fn=config_fn)
         return self
 
     def _es_wrapper_fn(self, os_name):
@@ -214,7 +232,25 @@ class ElasticsearchRunner:
             if process_exists(self.es_state.server_pid):
                 logging.warn('Failed to stop Elasticsearch server process PID %d ...' % self.es_state.server_pid)
 
+            # delete transient directories
+            if 'path' in self.es_config:
+                if 'log' in self.es_config['path']:
+                    log_path = self.es_config['path']['log']
+                    logging.info('Removing transient log path %s ...' % log_path)
+                    rmtree(log_path)
+
+                if 'data' in self.es_config['path']:
+                    data_path = self.es_config['path']['data']
+                    logging.info('Removing transient data path %s ...' % data_path)
+                    rmtree(data_path)
+
+            # delete temporary config file
+            if os.path.exists(self.es_state.config_fn):
+                logging.info('Removing transient configuration file %s ...' % self.es_state.config_fn)
+                os.remove(self.es_state.config_fn)
+
             self.es_state = None
+            self.es_config = None
         else:
             logging.warn('Elasticsearch is not running ...')
 

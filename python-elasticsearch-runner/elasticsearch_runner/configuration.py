@@ -30,7 +30,8 @@ def generate_config(cluster_name=None, log_path=None, data_path=None):
     }
 
     if not cluster_name:
-        cluster_name = 'elasticsearch_runner_%7d' % randint(1, 9999999)
+        cluster_name = generate_cluster_name()
+
     config['cluster'] = {'name': cluster_name}
 
     if log_path or data_path:
@@ -45,6 +46,21 @@ def generate_config(cluster_name=None, log_path=None, data_path=None):
         config['path'] = path
 
     return config
+
+
+def generate_cluster_name(prefix='elasticsearch_runner'):
+    """
+    Generates a cluster name with a prefix and a random number.
+
+    :param prefix: Cluster name prefix.
+    :rtype : str|unicode
+    :return: cluster name string
+
+    TODO make this collision safe
+    """
+    cluster_name = '%s_%7d' % (prefix, randint(1, 9999999))
+
+    return cluster_name
 
 
 def serialize_config(stream, config):
