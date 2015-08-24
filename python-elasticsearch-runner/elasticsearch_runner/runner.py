@@ -6,29 +6,75 @@ import re
 from shutil import copyfile, rmtree
 from tempfile import mkdtemp
 from time import sleep, clock
+from urlparse import urlparse
 from zipfile import ZipFile
 from subprocess import Popen
 
 from psutil import Process, NoSuchProcess
 import requests
 
-from elasticsearch_runner.configuration import serialize_config, generate_config, generate_cluster_name
-
-from es_text_analytics.data.dataset import project_path, download_file
+from elasticsearch_runner.configuration import serialize_config, generate_config, generate_cluster_name, package_path
 
 """
 Class for starting, stopping and managing an Elasticsearch instance from within a Python process.
 
 Intended for testing and other lightweight purposes with transient data.
 
-TODO Allow Elasticsearch custimaztion through rewriting the configuration file or other on instantiation.
-TODO Implement transient option - delete data on instance stop.
 TODO Faster Elasticsearch startup.
 """
 
-EMBEDDED_ES_FOLDER = os.path.join(project_path(), 'temp', 'embedded-es')
+# TODO put files outside the package directory?
+EMBEDDED_ES_FOLDER = os.path.join(package_path(), 'temp', 'embedded-es')
+
+# TODO add support for mutiple versions
 ES_DEFAULT_VERSION = '1.7'
 ES_URLS = {'1.7': 'https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.7.1.zip'}
+
+
+def fn_from_url(url):
+    """
+    Extract the final part of an url in order to get the filename of a downloaded url.
+
+    :param url: url string
+    :type url : str|unicode
+    :rtype : str|unicode
+    :return: url filename part
+    """
+    parse = urlparse(url)
+
+    return os.path.basename(parse.path)
+
+
+def download_file(url, dest_path):
+    """
+    Download the file pointed to by the url to the path specified .
+    If the file is already present at the path it will not be downloaded and the path to this file
+    is returned.
+
+    :param url: url string pointing to the file
+    :type url : str|unicode
+    :param dest_path: path to location where the file will be stored locally
+    :type dest_path : str|unicode
+    :rtype : str|unicode
+    :return: path to the downloaded file
+    """
+    if not os.path.exists(dest_path):
+        os.makedirs(dest_path)
+
+    fn = fn_from_url(url)
+    full_fn = os.path.join(dest_path, fn)
+
+    if os.path.exists(full_fn):
+        logging.info('Dataset archive %s already exists in %s ...' % (fn, dest_path))
+    else:
+        r = requests.get(url, stream=True)
+        with open(full_fn, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk: # filter out keep-alive new chunks
+                    f.write(chunk)
+                    f.flush()
+
+    return full_fn
 
 
 def check_java():
@@ -151,7 +197,7 @@ class ElasticsearchRunner:
                 z.extractall(self.install_path)
 
         # insert basic config file
-        copyfile(os.path.join(project_path(), 'python-elasticsearch-runner', 'resources', 'embedded_elasticsearch.yml'),
+        copyfile(os.path.join(package_path(), 'resources', 'embedded_elasticsearch.yml'),
                  os.path.join(self.install_path, 'elasticsearch-1.7.1', 'config', 'elasticsearch.yml'))
 
         return self
@@ -168,10 +214,9 @@ class ElasticsearchRunner:
         else:
             # generate and insert Elasticsearch configuration file with transient data and log paths
             cluster_name = generate_cluster_name()
-            log_path = mkdtemp(prefix='%s-log' % cluster_name, dir=self.install_path)
-            data_path = mkdtemp(prefix='%s-data' % cluster_name, dir=self.install_path)
+            data_path = mkdtemp(prefix='%s-data-' % cluster_name, dir=self.install_path)
 
-            self.es_config = generate_config(cluster_name=cluster_name, log_path=log_path, data_path=data_path)
+            self.es_config = generate_config(cluster_name=cluster_name, data_path=data_path)
             config_fn = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'config',
                                      'elasticsearch-%s.yml' % cluster_name)
 

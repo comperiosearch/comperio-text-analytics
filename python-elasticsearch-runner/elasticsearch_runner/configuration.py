@@ -1,3 +1,4 @@
+import os
 from random import randint
 
 import yaml
@@ -76,3 +77,15 @@ def serialize_config(stream, config):
     yaml.dump(config, stream=stream)
 
     return config
+
+
+def package_path():
+    """
+    Returns the path to the root of the package directory.
+
+    :rtype : str|unicode
+    :return: The root project path as a string.
+    """
+    self_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.abspath(os.path.join(self_path, '..'))
