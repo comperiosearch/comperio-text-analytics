@@ -18,7 +18,7 @@ def generate_config(cluster_name=None, log_path=None, data_path=None):
     :return: Elasticsearch configuration as dict.
     """
     config = {
-        'marvel': {'agent': {'enabled'}},
+        'marvel': {'agent': {'disabled'}},
         'index': {
             'number_of_shards': 1,
             'number_of_replicas': 0,
