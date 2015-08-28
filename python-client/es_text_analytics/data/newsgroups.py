@@ -82,6 +82,9 @@ def iterator(dataset_fn):
                 m_f.close()
 
                 doc = parse(msg)
+                doc['group'] = group
+                doc['doc_id'] = doc_id
+
 
                 yield doc
 
