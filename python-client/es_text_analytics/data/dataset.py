@@ -82,7 +82,7 @@ def default_dataset_path():
     return os.path.join(project_path(), 'data')
 
 
-def parse_conll(fileobj):
+def parse_conll(fileobj, field_indices=None):
     """
     Parse a CONLL formatted dependency treebank file. Supports the CONLL-U format
     with UTF-8 encoding.
@@ -107,6 +107,9 @@ def parse_conll(fileobj):
         row = line.split(u'\t')
         row[0] = int(row[0])
 
+        if field_indices:
+            row = [row[i] for i in field_indices]
+
         sentence.append(row)
 
     if sentence:
@@ -121,7 +124,7 @@ class Dataset:
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, index=None, doc_type=None, dataset_path=None):
+    def __init__(self, index=None, doc_type=None, dataset_path=None, normalize_func=None):
         """
         Initialize the instance with optional Elasticsearch index information.
 
@@ -131,12 +134,15 @@ class Dataset:
         :type doc_type: str|unicode
         :param dataset_path: location where dataset wiil be downloaded. If None the default location is used.
         :type dataset_path: None|str|unicode
+        :param normalize_func: Function to normalize corpus documemt format. Default will create a dict with a field
+          that contains the full document text. Exact format is corpus dependent.
+        :type normalize_func: function|None
         """
         self.es_index = index
         self.es_doc_type = doc_type
         self.dataset_fn = None
         self.archive_fn = None
-        self.normalize_func = None
+        self.normalize_func = normalize_func
 
         if not dataset_path:
             self.dataset_path = default_dataset_path()
@@ -153,7 +159,7 @@ class Dataset:
 
     def __iter__(self):
         if not self.dataset_fn:
-            raise ValueError
+            raise ValueError()
 
         for doc in self._iterator():
             try:

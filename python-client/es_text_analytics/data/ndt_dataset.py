@@ -41,7 +41,7 @@ def filelist(lang=None, sections=None):
     return files
 
 
-def iterator(dataset_fn, sections=None, lang=None):
+def iterator(dataset_fn, sections=None, lang=None, field_indices=None):
     """
     Provides an iterator of CONLL formatted sentences from NDT.
 
@@ -61,7 +61,7 @@ def iterator(dataset_fn, sections=None, lang=None):
                 logging.info('parsing %s ...' % member.name)
                 m_f = f.extractfile(member)
 
-                for sentence in parse_conll(m_f):
+                for sentence in parse_conll(m_f, field_indices=field_indices):
                     yield sentence
 
                 m_f.close()
@@ -84,15 +84,34 @@ class NDTDataset(Dataset):
     Class encapsulating the Norwegian Dependency Treebank. Uses the main CONLL data files.
     See http://www.nb.no/sprakbanken/show?serial=sbr-10&lang=nb for details.
     """
-    def __init__(self, index='ndt', doc_type='sentence', dataset_path=None, lang=None, sections=None):
-        super(NDTDataset, self).__init__(index, doc_type, dataset_path)
+
+
+    def __init__(self, index='ndt', doc_type='sentence', dataset_path=None, lang=None,
+                 sections=None, fields=None, normalize_func=normalize):
+        """
+        Default includes all sections, languages and fields.
+
+        :param sections: Sections to include (blog, newspaper, partliament, report).
+        :type sections: list[str|unicode]|None
+        :param lang: Languages to include (nno, nob).
+        :type lang: list[str|unicode]|None
+        :param fields: Columns to include (index, form, lemma, cpostag, postag, feats, head, deprel, deps, misc).
+        :type fields: list[str|unicode]|None
+        """
+        super(NDTDataset, self).__init__(index=index, doc_type=doc_type, dataset_path=dataset_path,
+                                         normalize_func=normalize_func)
 
         self.archive_fn = NDT_ARCHIVE_URL
+        self.field_indices = None
         self.fields = CONLL_U_FIELDS
+
+        if fields:
+            self.fields = fields
+            self.field_indices = [CONLL_U_FIELDS.index(f) for f in fields]
 
         self.sections = sections
         self.lang = lang
-        self.normalize_func = normalize
 
     def _iterator(self):
-        return iterator(self.dataset_fn, sections=self.sections, lang=self.lang)
+        return iterator(self.dataset_fn, sections=self.sections,
+                        lang=self.lang, field_indices=self.field_indices)
