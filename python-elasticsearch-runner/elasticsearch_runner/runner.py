@@ -9,6 +9,7 @@ from time import sleep, clock
 from urlparse import urlparse
 from zipfile import ZipFile
 from subprocess import Popen
+import errno
 
 from psutil import Process, NoSuchProcess
 import requests
@@ -225,13 +226,21 @@ class ElasticsearchRunner:
 
             # create the log file if it doesn't exist yet. We need to open it and seek to to the end before
             # sniffing out the configuration info from the log.
-            es_log_fn = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'logs',
-                                     '%s.log' % cluster_name)
+            es_log_dir = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'logs')
+            es_log_fn = os.path.join(es_log_dir, '%s.log' % cluster_name)
+
+            try:
+                os.makedirs(es_log_dir)
+            except OSError as exception:
+                if exception.errno != errno.EEXIST:
+                    raise
+
             open(es_log_fn, 'a').close()
+
             es_log_f = open(es_log_fn, 'r')
             es_log_f.seek(0, 2)
 
-            wrapper_proc = Popen([self._es_wrapper_fn(os.name), '-Des.config=%s' % config_fn], shell=True)
+            wrapper_proc = Popen(self._es_wrapper_call(os.name) + ['-Des.config=%s' % config_fn])
 
             # watch the log
             server_pid, es_port = parse_es_log_header(es_log_f)
@@ -248,17 +257,17 @@ class ElasticsearchRunner:
                                                config_fn=config_fn)
         return self
 
-    def _es_wrapper_fn(self, os_name):
+    def _es_wrapper_call(self, os_name):
         """
         :param os_name: OS identifier as returned by os.name
         :type os_name: str|unicode
-        :rtype : str|unicode
+        :rtype : list[str|unicode]
         :return:
         """
         if os_name == 'nt':
-            es_bin = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'bin', 'elasticsearch.bat')
+            es_bin = [os.path.join(self.install_path, 'elasticsearch-1.7.1', 'bin', 'elasticsearch.bat')]
         else:
-            es_bin = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'bin', 'elasticsearch')
+            es_bin = ['/bin/sh', os.path.join(self.install_path, 'elasticsearch-1.7.1', 'bin', 'elasticsearch')]
 
         return es_bin
 

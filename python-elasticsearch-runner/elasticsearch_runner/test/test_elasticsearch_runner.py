@@ -85,10 +85,10 @@ class TestElasticsearchRunner(TestCase):
         self.assertFalse(self.runner2.is_running())
         self.assertIsNone(self.runner2.es_state)
 
-    def test_es_wrapper_fn(self):
+    def test_es_wrapper_call(self):
         runner = ElasticsearchRunner(install_path='fakepath')
 
-        self.assertEqual(runner._es_wrapper_fn('nt'),
-                         os.path.sep.join(['fakepath', 'elasticsearch-1.7.1', 'bin', 'elasticsearch.bat']))
-        self.assertEqual(runner._es_wrapper_fn('posix'),
-                         os.path.sep.join(['fakepath', 'elasticsearch-1.7.1', 'bin', 'elasticsearch']))
+        self.assertEqual(runner._es_wrapper_call('nt'),
+                         [os.path.sep.join(['fakepath', 'elasticsearch-1.7.1', 'bin', 'elasticsearch.bat'])])
+        self.assertEqual(runner._es_wrapper_call('posix'),
+                         ['/bin/sh', os.path.sep.join(['fakepath', 'elasticsearch-1.7.1', 'bin', 'elasticsearch'])])
