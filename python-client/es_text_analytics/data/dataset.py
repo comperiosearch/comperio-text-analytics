@@ -5,7 +5,6 @@ import os
 from urlparse import urlparse
 
 from elasticsearch.client import IndicesClient
-
 import requests
 
 BULK_REQUEST_SIZE = 100
@@ -124,7 +123,8 @@ class Dataset:
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, index=None, doc_type=None, dataset_path=None, normalize_func=None):
+    def __init__(self, index=None, doc_type=None, dataset_path=None, dataset_fn=None,
+                 normalize_func=None):
         """
         Initialize the instance with optional Elasticsearch index information.
 
@@ -134,13 +134,16 @@ class Dataset:
         :type doc_type: str|unicode
         :param dataset_path: location where dataset wiil be downloaded. If None the default location is used.
         :type dataset_path: None|str|unicode
+        :param dataset_fn: Location of the dataset. If this argument is used the file specified will be used and
+          the archive will not be downloaded automatically if not present.
+        :type dataset_fn: None|str|unicode
         :param normalize_func: Function to normalize corpus documemt format. Default will create a dict with a field
           that contains the full document text. Exact format is corpus dependent.
         :type normalize_func: function|None
         """
         self.es_index = index
         self.es_doc_type = doc_type
-        self.dataset_fn = None
+        self.dataset_fn = dataset_fn
         self.archive_fn = None
         self.normalize_func = normalize_func
 
@@ -219,7 +222,11 @@ class Dataset:
         :type es: None|elasticsearch.client.Elasticsearch
         :rtype : Dataset
         """
-        self.dataset_fn = download_file(self.archive_fn, dest_path=self.dataset_path)
+        if self.dataset_fn:
+            logging.warn('Dataset initialized directly or already installed ...')
+            return self
+        else:
+            self.dataset_fn = download_file(self.archive_fn, dest_path=self.dataset_path)
 
         if es:
             logging.info("Creating Elasticsearch index %s ..." % self.index)

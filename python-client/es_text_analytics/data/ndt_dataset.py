@@ -86,8 +86,9 @@ class NDTDataset(Dataset):
     """
 
 
-    def __init__(self, index='ndt', doc_type='sentence', dataset_path=None, lang=None,
-                 sections=None, fields=None, normalize_func=normalize):
+    def __init__(self, index='ndt', doc_type='sentence', dataset_path=None,
+                 dataset_fn=None, lang=None, sections=None, fields=None,
+                 normalize_func=normalize):
         """
         Default includes all sections, languages and fields.
 
@@ -99,7 +100,7 @@ class NDTDataset(Dataset):
         :type fields: list[str|unicode]|None
         """
         super(NDTDataset, self).__init__(index=index, doc_type=doc_type, dataset_path=dataset_path,
-                                         normalize_func=normalize_func)
+                                         dataset_fn=dataset_fn, normalize_func=normalize_func)
 
         self.archive_fn = NDT_ARCHIVE_URL
         self.field_indices = None
