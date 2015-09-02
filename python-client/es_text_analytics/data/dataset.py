@@ -147,10 +147,10 @@ class Dataset:
         self.archive_fn = None
         self.normalize_func = normalize_func
 
+        self.dataset_path = dataset_path
+
         if not dataset_path:
             self.dataset_path = default_dataset_path()
-        else:
-            pass
 
     @abstractmethod
     def _iterator(self):
