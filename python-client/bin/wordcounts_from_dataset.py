@@ -7,6 +7,8 @@ from textblob import TextBlob
 
 from es_text_analytics.data import newsgroups
 from es_text_analytics.data.dataset import download_file, default_dataset_path
+from es_text_analytics.data.ndt_dataset import NDTDataset
+from es_text_analytics.tokenizer import NOTokenizer
 
 """
 Generates wordcounts from a dataset.
@@ -15,8 +17,14 @@ Stores the counts in a Gensim Dictionary text file with id, word and count as ta
 """
 
 
-def preprocess(doc):
+NO_TOKENIZER = NOTokenizer()
+
+def preprocess_ng(doc):
     return [w.lower() for w in TextBlob(doc['msg']).words]
+
+
+def preprocess_ndt(doc):
+    return [w.lower() for w in TextBlob(doc['content'], tokenizer=NO_TOKENIZER).words]
 
 
 def main():
@@ -41,8 +49,13 @@ def main():
         sys.exit(1)
 
     if dataset_name == 'newsgroups':
-        corpus = (preprocess(doc) for doc
+        corpus = (preprocess_ng(doc) for doc
                   in newsgroups.iterator(download_file(newsgroups.NEWSGROUPS_ARCHIVE_URL, dataset_path)))
+    if dataset_name == 'ndt':
+        dataset = NDTDataset(dataset_path=dataset_path)
+        dataset.install()
+
+        corpus = (preprocess_ndt(doc) for doc in dataset)
     else:
         logging.error('Unknown dataset %s ...' % dataset_name)
         sys.exit(1)
