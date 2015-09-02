@@ -196,7 +196,7 @@ class SimpleTermWeightProvider(TermWeightingProvider):
         return self.weight_map
 
 
-class ESTermWeightProvider(TermWeightingProvider):
+class ESIndexTermWeightProvider(TermWeightingProvider):
     """
     Term weight provider for DF/IDF values based on an Elasticsearch index using the terms aggregator.
 
@@ -204,7 +204,7 @@ class ESTermWeightProvider(TermWeightingProvider):
     """
 
     def __init__(self, es, index, doc_type, field, **kwargs):
-        super(ESTermWeightProvider, self).__init__(**kwargs)
+        super(ESIndexTermWeightProvider, self).__init__(**kwargs)
 
         self.es = es
         self.index = index
@@ -229,6 +229,9 @@ class ESTermWeightProvider(TermWeightingProvider):
 
 
 class GensimIDFProvider(TermWeightingProvider):
+    """
+    IDF TermWeightingProvider based on a Gensim Dictionary using the Gensim TfIdf model.
+    """
     def __init__(self, dictionary, **kwargs):
         super(GensimIDFProvider, self).__init__(**kwargs)
 
@@ -236,4 +239,7 @@ class GensimIDFProvider(TermWeightingProvider):
             dictionary = Dictionary.load(dictionary)
         self.dictionary = dictionary
         self.tfidf = TfidfModel(dictionary=dictionary, normalize=False)
+
+    def _weights_for_terms(self, terms):
+        return {self.dictionary[bow_id]: val for bow_id, val in self.tfidf[self.dictionary.doc2bow(terms)]}
 
