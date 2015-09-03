@@ -10,6 +10,7 @@ from es_text_analytics.tagger import train_hunpos_model, FEATURES_MAP
 
 
 
+
 # Trains a Norwegian part-of-speech tagger with the NDT dataset.
 # The tagger is trained on the combined Bokmål and Nynorsk material.
 
@@ -17,8 +18,8 @@ from es_text_analytics.tagger import train_hunpos_model, FEATURES_MAP
 # -f, --features The normalized feature set, no-feats, simple or universal. See tagger.py for details.
 # -m, --model-file Where to save the resulting model. Crearet a default filename in the current directory
 #   if omitted.
-# -d, -dataset-file Where to find the NDT dataset. Uses default location if omitted.
-
+# -d, --dataset-file Where to find the NDT dataset. Uses default location if omitted.
+# -l, --language Which language training set to use: nob (bokmål), nno (nynorsk) or both.
 
 FIELDS = ['form', 'postag', 'feats']
 
@@ -28,12 +29,14 @@ def main():
     parser.add_argument('-f', '--features')
     parser.add_argument('-m', '--model-file')
     parser.add_argument('-d', '--dataset-file')
+    parser.add_argument('-l', '--language', default='nob')
 
     args = parser.parse_args()
 
     features = args.features
     model_fn = args.model_file
     dataset_fn = args.dataset_file
+    lang = args.language
 
     if not features in FEATURES_MAP:
         logging.error('Unknown feature identifier %s (one of <%s>) ...'
@@ -48,10 +51,17 @@ def main():
         # noinspection PyUnresolvedReferences
         model_fn = 'no-ndt-hunpos-%s-%s' % (features, datetime.now().strftime("%Y-%m-%d-%H-%M"))
 
+    if not lang in ['nob', 'nno', 'both']:
+        logging.error('Uknown language %s (one of <%s>) ...' % (lang), '|'.join(['nob', 'nno', 'both']))
+        sys.exit(1)
+
+    if lang == 'both':
+        lang = None
+
     if dataset_fn:
-        dataset = NDTDataset(dataset_fn=dataset_fn, normalize_func=None, fields=FIELDS)
+        dataset = NDTDataset(dataset_fn=dataset_fn, normalize_func=None, fields=FIELDS, lang=lang)
     else:
-        dataset = NDTDataset(normalize_func=None, fields=FIELDS)
+        dataset = NDTDataset(normalize_func=None, fields=FIELDS, lang=lang)
         dataset.install()
 
     pos_norm_func = FEATURES_MAP[features]
