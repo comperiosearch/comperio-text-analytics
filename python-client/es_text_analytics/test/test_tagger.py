@@ -2,8 +2,8 @@
 import os
 from unittest import TestCase
 
-from es_text_analytics.tagger import obt_to_universal_tag, parse_hunpos_train_output, NO_TAGGER_DEFAULT_MODEL_FN, \
-    NOTagger
+from es_text_analytics.tagger import obt_to_universal_tag, parse_hunpos_train_output, NOBTagger
+from es_text_analytics.tagger import NNO_TAGGER_DEFAULT_MODEL_FN, NNOTagger, NOB_TAGGER_DEFAULT_MODEL_FN
 
 HUNPUS_OUTPUT_SAMPLE = """
 reading training corpus
@@ -38,10 +38,10 @@ class TestTaggerHelpers(TestCase):
                        parse_hunpos_train_output(HUNPUS_OUTPUT_SAMPLE))
 
 
-class TestNOTagger(TestCase):
+class TestNOBTagger(TestCase):
     def test_tag(self):
-        if os.path.exists(NO_TAGGER_DEFAULT_MODEL_FN):
-            tagger = NOTagger()
+        if os.path.exists(NOB_TAGGER_DEFAULT_MODEL_FN):
+            tagger = NOBTagger()
             self.assertEqual([(u'Dette', 'PRON_PERS'),
                               (u'er', 'VERB'),
                               (u'vårt', 'DET'),
@@ -49,4 +49,17 @@ class TestNOTagger(TestCase):
                               (u'.', 'PUNKT')],
                              tagger.tag(u'Dette er vårt hus.'))
         else:
-            self.skipTest('NOTagger default model not found in %s' % NO_TAGGER_DEFAULT_MODEL_FN)
+            self.skipTest('NOBTagger default model not found in %s' % NOB_TAGGER_DEFAULT_MODEL_FN)
+
+
+class TestNNOTagger(TestCase):
+    def test_tag(self):
+        if os.path.exists(NNO_TAGGER_DEFAULT_MODEL_FN):
+            tagger = NNOTagger()
+            self.assertEqual([(u'Røyndommen', 'SUBST'),
+                              (u'rammar', 'VERB'),
+                              (u'alle', 'DET'),
+                              (u'.', 'PUNKT')],
+                             tagger.tag(u'Røyndommen rammar alle.'))
+        else:
+            self.skipTest('NNOTagger default model not found in %s' % NNO_TAGGER_DEFAULT_MODEL_FN)

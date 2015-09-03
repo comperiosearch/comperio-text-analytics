@@ -1,3 +1,4 @@
+# coding=utf-8
 import logging
 import os
 import re
@@ -15,10 +16,13 @@ from es_text_analytics.tokenizer import NOTokenizer
 
 
 
+
+
 # TextBlob compatible part-of-speech tagger for Norwegian.
 
-# default HunPos model loation
-NO_TAGGER_DEFAULT_MODEL_FN = os.path.join(project_path(), 'models', 'no-tagger-default-model')
+# default HunPos model locations
+NOB_TAGGER_DEFAULT_MODEL_FN = os.path.join(project_path(), 'models', 'nob-tagger-default-model')
+NNO_TAGGER_DEFAULT_MODEL_FN = os.path.join(project_path(), 'models', 'nno-tagger-default-model')
 
 HUNPOS_URL_MAP = {
     'linux2': 'https://hunpos.googlecode.com/files/hunpos-1.0-linux.tgz',
@@ -303,13 +307,29 @@ def train_hunpos_model(seq, model_fn):
     return stats
 
 
-class NOTagger (BaseTagger, object):
+class NOBTagger (BaseTagger, object):
     """
-    TextBlob compatible POS tagger class based on the NLTK HunPos wrapper.
+    TextBlob compatible Norsk Bokmål POS tagger class based on the NLTK HunPos wrapper.
     """
     def __init__(self, model_fn=None):
         self.tokenizer = NOTokenizer()
-        self.tagger = HunposTagger(NO_TAGGER_DEFAULT_MODEL_FN,
+        self.tagger = HunposTagger(NOB_TAGGER_DEFAULT_MODEL_FN,
+                                   hunpos_tag_bin(), encoding='utf-8')
+
+    def tag(self, text, tokenize=True):
+        if tokenize:
+            text = self.tokenizer.tokenize(text)
+
+        return self.tagger.tag(text)
+
+
+class NNOTagger (BaseTagger, object):
+    """
+    TextBlob compatible Norsk Nynorsk POS tagger class based on the NLTK HunPos wrapper.
+    """
+    def __init__(self, model_fn=None):
+        self.tokenizer = NOTokenizer()
+        self.tagger = HunposTagger(NNO_TAGGER_DEFAULT_MODEL_FN,
                                    hunpos_tag_bin(), encoding='utf-8')
 
     def tag(self, text, tokenize=True):
