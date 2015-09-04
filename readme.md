@@ -68,8 +68,8 @@ Based on Norsk Ordbank. It is possible to pass the part of speech tag in order t
 have more than one lemma form.
 
 ```python
-sent = nob_t.tag(u'Vi er godt forberedt.')
-[(t[0], lem.lemmatize(t[0], t[1])) for t in sent]
+sent = tagger.tag(u'Vi er godt forberedt.')
+[(word, lem.lemmatize(word, tag)) for word, tag in sent]
 
 [(u'Vi', u'vi'),
  (u'er', u'være'),
