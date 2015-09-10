@@ -1,9 +1,16 @@
 from abc import ABCMeta, abstractmethod
+import logging
 from math import log
 import re
 
+from elasticsearch.client import IndicesClient
 from gensim.corpora import Dictionary
 from gensim.models import TfidfModel
+
+ES_TERM_WEIGHTING_INDEX_DEFAULT_NAME = 'es_term_weighting_index'
+
+ES_TERMWEIGHTING_INDEX_SETTINGS = {"mappings": {
+    "term": {"properties": {"form": {"type": "string", "index": "not_analyzed"}, "value": {"type": "float"}}}}}
 
 
 class TermWeightingProvider:
@@ -196,7 +203,7 @@ class SimpleTermWeightProvider(TermWeightingProvider):
         return self.weight_map
 
 
-class ESIndexTermWeightProvider(TermWeightingProvider):
+class ESTermAggregationWeightProvider(TermWeightingProvider):
     """
     Term weight provider for DF/IDF values based on an Elasticsearch index using the terms aggregator.
 
@@ -204,7 +211,7 @@ class ESIndexTermWeightProvider(TermWeightingProvider):
     """
 
     def __init__(self, es, index, doc_type, field, **kwargs):
-        super(ESIndexTermWeightProvider, self).__init__(**kwargs)
+        super(ESTermAggregationWeightProvider, self).__init__(**kwargs)
 
         self.es = es
         self.index = index
@@ -235,6 +242,10 @@ class GensimIDFProvider(TermWeightingProvider):
     def __init__(self, dictionary, **kwargs):
         super(GensimIDFProvider, self).__init__(**kwargs)
 
+        if {'missing', 'linear', 'linear'} <= set(kwargs):
+            logging.warning('<%s> argumemts to GensimIDFProvider can generate incorrect weights and should not be used'
+                            % '|'.join({'missing', 'linear', 'linear'}))
+
         if isinstance(dictionary, (str, unicode)):
             dictionary = Dictionary.load(dictionary)
         self.dictionary = dictionary
@@ -243,3 +254,87 @@ class GensimIDFProvider(TermWeightingProvider):
     def _weights_for_terms(self, terms):
         return {self.dictionary[bow_id]: val for bow_id, val in self.tfidf[self.dictionary.doc2bow(terms)]}
 
+
+class ESTermIndexWeightingProvider(TermWeightingProvider):
+    """
+    Class implementing storage of term weights in an Elasticsearch index.
+    """
+    def __init__(self, es, index=None, initial_weights=None, **kwargs):
+        """
+        :param es: Elasticsearch instance from py-elasticsearch API.
+        :type es:elasticsearch.Elasticsearch
+        :param index: Name of the index where term weights are stored. If it doesn't exist it is created.
+        :type index:str|unicode
+        :param initial_weights: Iterator with term/weight pairs that will be added to the index during initialization.
+        """
+        super(ESTermIndexWeightingProvider, self).__init__(**kwargs)
+
+        self.es = es
+        self.index = index
+
+        if not self.index:
+            self.index = ES_TERM_WEIGHTING_INDEX_DEFAULT_NAME
+
+        ESTermIndexWeightingProvider._create_weight_index(self.es, self.index)
+
+        if initial_weights:
+            ESTermIndexWeightingProvider._add_terms_iter(self.es, self.index, initial_weights)
+
+    @staticmethod
+    def _create_weight_index(es, index):
+        """
+        Creates the index with the right mapping if it doesn't exist.
+
+        :param es:
+        :type es:elasticsearch.Elasticsearch
+        :param index:
+        :type index:str|unicode
+        """
+        ic = IndicesClient(es)
+
+        if ic.exists(index):
+            logging.info('Index %s already exists ...' % index)
+        else:
+            ic.create(index=index, body=ES_TERMWEIGHTING_INDEX_SETTINGS)
+
+    @staticmethod
+    def _add_terms_iter(es, index, iter, bulk_size=1000):
+        """
+        Adds term documents to the index from the term weight pairs in the iterator.
+
+        :param es:
+        :type es:elasticsearch.Elasticsearch
+        :param index:
+        :type index:str|unicode
+        :param iter:
+        """
+        bulk_actions = []
+        count = 0
+
+        for term, weight in iter:
+            count = 1
+
+            bulk_actions += [{'index': {'_index': index, '_type': 'term'}},
+                             {'form': term, 'value': weight}]
+
+            if len(bulk_actions) % (2 * bulk_size) == 0:
+                es.bulk(index=index, doc_type='term', body=bulk_actions)
+                logging.info('Added %d documents ...' % count)
+                bulk_actions = []
+
+        if bulk_actions:
+            es.bulk(index=index, doc_type='term', body=bulk_actions)
+            logging.info('Added %d documents ...' % count)
+
+    def _weights_for_terms(self, terms):
+        should_clauses = [{'match': {'form': term}} for term in terms]
+
+        resp = self.es.search(index=self.index, doc_type='term',
+                       body={'query': {
+                           'bool': {
+                               'should': should_clauses
+                           }
+                       },
+                       'fields': ['form', 'value']})
+
+        return {hit['fields']['form'][0]: float(hit['fields']['value'][0]) for hit in resp['hits']['hits']}
