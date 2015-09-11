@@ -4,8 +4,9 @@ from unittest import TestCase
 from elasticsearch.client import Elasticsearch, IndicesClient
 from gensim.corpora.dictionary import Dictionary
 
-from es_text_analytics.term_weight_provider import SimpleTermWeightProvider, ESIndexTermWeightProvider, \
-    weight_map_from_term_counts, term_counts_line_parser, term_counts_iter_from_file, GensimIDFProvider
+from es_text_analytics.term_weight_provider import SimpleTermWeightProvider, ESTermAggregationWeightProvider, \
+    weight_map_from_term_counts, term_counts_line_parser, term_counts_iter_from_file, GensimIDFProvider, \
+    ESTermIndexWeightingProvider
 from es_text_analytics.test import es_runner
 
 
@@ -129,10 +130,10 @@ class TestSimpleTermWeightProvider(TestCase):
         self.assertIsNone(provider['notfound'])
 
 
-class TestESIndexTermWeightProvider(TestCase):
+class TestESTermAggregationWeightProvider(TestCase):
 
     def setUp(self):
-        super(TestESIndexTermWeightProvider, self).setUp()
+        super(TestESTermAggregationWeightProvider, self).setUp()
 
         self.es = Elasticsearch(hosts=['localhost:%d' % es_runner.es_state.port])
         self.ic = IndicesClient(self.es)
@@ -154,13 +155,13 @@ class TestESIndexTermWeightProvider(TestCase):
         self.es.create(self.index, self.doc_type, {self.field: 'ba'}, refresh=True)
 
     def tearDown(self):
-        super(TestESIndexTermWeightProvider, self).tearDown()
+        super(TestESTermAggregationWeightProvider, self).tearDown()
 
         self.ic.delete(self.index)
 
 
     def test_getitem_single(self):
-        provider = ESIndexTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+        provider = ESTermAggregationWeightProvider(self.es, self.index, self.doc_type, self.field,
                                         inverse=False, sublinear=False)
 
         term, w = provider['ba']
@@ -177,7 +178,7 @@ class TestESIndexTermWeightProvider(TestCase):
         self.assertAlmostEqual(.125, w)
 
     def test_inverse(self):
-        provider = ESIndexTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+        provider = ESTermAggregationWeightProvider(self.es, self.index, self.doc_type, self.field,
                                         inverse=True, sublinear=False)
         term, w = provider['ba']
         self.assertEqual('ba', term)
@@ -193,7 +194,7 @@ class TestESIndexTermWeightProvider(TestCase):
         self.assertAlmostEqual(8., w)
 
     def test_sublinear(self):
-        provider = ESIndexTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+        provider = ESTermAggregationWeightProvider(self.es, self.index, self.doc_type, self.field,
                                         inverse=False, sublinear=True)
         term, w = provider['ba']
         self.assertEqual('ba', term)
@@ -209,7 +210,7 @@ class TestESIndexTermWeightProvider(TestCase):
         self.assertAlmostEqual(-2.079442, w, places=4)
 
     def test_inverse_sublinear(self):
-        provider = ESIndexTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+        provider = ESTermAggregationWeightProvider(self.es, self.index, self.doc_type, self.field,
                                         inverse=True, sublinear=True)
         term, w = provider['ba']
         self.assertEqual('ba', term)
@@ -225,7 +226,7 @@ class TestESIndexTermWeightProvider(TestCase):
         self.assertAlmostEqual(2.079442, w, places=4)
 
     def test_getitem_multiple(self):
-        provider = ESIndexTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+        provider = ESTermAggregationWeightProvider(self.es, self.index, self.doc_type, self.field,
                                         inverse=False, sublinear=False)
 
         weights = dict(provider[['ba', 'foo', 'knark', 'knirk']])
@@ -243,13 +244,13 @@ class TestESIndexTermWeightProvider(TestCase):
         self.assertAlmostEqual(weights['foo'], .125)
 
     def test_getitem_missing(self):
-        provider = ESIndexTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+        provider = ESTermAggregationWeightProvider(self.es, self.index, self.doc_type, self.field,
                                         inverse=False, sublinear=False)
 
         self.assertRaises(KeyError, lambda: provider['notfound'])
         self.assertRaises(KeyError, lambda: provider['ba', 'notfound'])
 
-        provider = ESIndexTermWeightProvider(self.es, self.index, self.doc_type, self.field,
+        provider = ESTermAggregationWeightProvider(self.es, self.index, self.doc_type, self.field,
                                         inverse=False, sublinear=False, missing='ignore')
 
         self.assertIsNone(provider['notfound'])
@@ -301,6 +302,74 @@ class TestGensimIDFProvider(TestCase):
         self.assertRaises(KeyError, lambda: provider['ba', 'notfound'])
 
         provider = GensimIDFProvider(self.dictionary, missing='ignore')
+
+        self.assertIsNone(provider['notfound'])
+        self.assertEqual([('ba', 1)], list(provider['ba', 'notfound']))
+
+
+class TestESTermIndexWeightingProvider(TestCase):
+    def setUp(self):
+        super(TestESTermIndexWeightingProvider, self).setUp()
+
+        self.es = Elasticsearch(hosts=['localhost:%d' % es_runner.es_state.port])
+        self.index = 'test_es_term_index_weighting_provider'
+        ESTermIndexWeightingProvider._create_weight_index(self.es, self.index)
+
+    def tearDown(self):
+        super(TestESTermIndexWeightingProvider, self).tearDown()
+
+        ic = IndicesClient(self.es)
+        ic.delete(self.index)
+
+    def test_getitem_single(self):
+        provider = ESTermIndexWeightingProvider(self.es, self.index,
+                                                initial_weights=[('ba', 1), ('knark', 2), ('knirk', 3), ('foo', 3)])
+        IndicesClient(self.es).refresh(self.index)
+
+        term, w = provider['ba']
+        self.assertEqual('ba', term)
+        self.assertAlmostEqual(1, w)
+        term, w = provider['knark']
+        self.assertEqual('knark', term)
+        self.assertAlmostEqual(2, w)
+        term, w = provider['knirk']
+        self.assertEqual('knirk', term)
+        self.assertAlmostEqual(3, w)
+        term, w = provider['foo']
+        self.assertEqual('foo', term)
+        self.assertAlmostEqual(3, w)
+
+    def test_getitem_multiple(self):
+        provider = ESTermIndexWeightingProvider(self.es, self.index,
+                                                initial_weights=[('ba', 1), ('knark', 2), ('knirk', 3), ('foo', 3)])
+        IndicesClient(self.es).refresh(self.index)
+
+        weights = dict(provider[['ba', 'foo', 'knark', 'knirk']])
+        self.assertEqual(['ba', 'foo', 'knark', 'knirk'], sorted(weights.keys()))
+        self.assertAlmostEqual(weights['ba'], 1)
+        self.assertAlmostEqual(weights['knark'], 2)
+        self.assertAlmostEqual(weights['knirk'], 3)
+        self.assertAlmostEqual(weights['foo'], 3)
+
+        weights = dict(provider['ba', 'foo', 'knark', 'knirk'])
+        self.assertEqual(['ba', 'foo', 'knark', 'knirk'], sorted(weights.keys()))
+        self.assertAlmostEqual(weights['ba'], 1)
+        self.assertAlmostEqual(weights['knark'], 2)
+        self.assertAlmostEqual(weights['knirk'], 3)
+        self.assertAlmostEqual(weights['foo'], 3)
+
+    def test_getitem_missing(self):
+        provider = ESTermIndexWeightingProvider(self.es, self.index,
+                                                initial_weights=[('ba', 1), ('knark', 2), ('knirk', 3), ('foo', 3)])
+        IndicesClient(self.es).refresh(self.index)
+
+        self.assertRaises(KeyError, lambda: provider['notfound'])
+        self.assertRaises(KeyError, lambda: provider['ba', 'notfound'])
+
+        provider = ESTermIndexWeightingProvider(self.es, self.index,
+                                                initial_weights=[('ba', 1), ('knark', 2), ('knirk', 3), ('foo', 3)],
+                                                missing='ignore')
+        IndicesClient(self.es).refresh(self.index)
 
         self.assertIsNone(provider['notfound'])
         self.assertEqual([('ba', 1)], list(provider['ba', 'notfound']))
