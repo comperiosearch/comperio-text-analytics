@@ -129,3 +129,46 @@ In order to set up up a Vagrant development server run:
 vagrant up
 fab vagrant provision_server
 ```
+
+
+#Installation notes
+
+Download ordbank_bm.zip from Comperio AWS S3 at https://console.aws.amazon.com/s3/home?region=eu-west-1#&bucket=language-resources&prefix=no/
+unzip into folder data/ordbank_bm
+
+You need some modules, at least these
+
+    pip install uniseg textblob nltk 
+
+You need to add the path to the comperio-text-analytics to your python
+
+    sys.path.append('.../comperio-text-analytics/python-client')
+
+
+To use the Lemmatizer:
+
+    from es_text_analytics.lemmatizer import OrdbankLemmatizer
+    ord = OrdbankLemmatizer()
+    ord.lemmatize("fisk", "SUBST")
+
+To use the tagger and decompounder
+
+    from es_text_analytics.tagger import NOBTagger, install_hunpos
+    from es_text_analytics.decompounder import NOBDecompounder
+
+Build models:
+
+    "comperio-text-analytics\python-client\bin\build-all-models.bat"
+
+    install_hunpos()
+    nobtag = NOBTagger()
+    nobdec = NOBDecompounder()
+    nobdec.decompound(u"avisforside")
+
+lemmatize a list of tokenized words
+
+    [ord.lemmatize(w) for w in tok.tokenize(u"jeg er en fisker med fiskebåter")] 
+
+decompound a list of words
+
+    [nobdec.decompound(w) for w in tok.tokenize(u"smultringmesterpakklagerassistenten har ansvaret for mediadekningen")] 
