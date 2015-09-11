@@ -17,7 +17,7 @@ TODO: Return POS tags for internal word components.
 
 # allowed POS tags that can form compounds
 COMPOUND_POS_MAP = {
-    'simple': ['SUBST', 'ADV', 'ADV', 'VERB']
+    'simple': ['SUBST', 'ADJ', 'ADV', 'VERB']
 }
 
 # The decompounder searches for fullform matches from the beginning of the string creates a tree
