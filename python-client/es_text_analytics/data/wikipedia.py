@@ -15,6 +15,7 @@ import threading
 import os.path
 from bz2 import BZ2File
 import io
+import wiki_infobox
 
 from lxml import etree
 
@@ -149,7 +150,9 @@ def extract_page(element):
     """
     # get metadata/data
     metadata = dict(extract_metadata(element))
-
+    infometa = wiki_infobox.scrape_infobox(metadata['revision.text'])
+    if not infometa is None:
+        metadata['infoboks'] = infometa
     # extract text using WikiExtractor
     e = Extractor(int(metadata['id']), metadata['title'], metadata['revision.text'])
     Extractor.toHTML = False
@@ -168,15 +171,18 @@ def extract_page(element):
     return metadata
 
 
-def iterator(dump_fn):
+def iterator(dump_fn, num_articles):
     """
     Yields the page content and metadata as dicts.
 
+    :param num_articles: how many articles. 0 means all
     :param dump_fn: BZip2 copressed Wikipedia XML dump.
     :type dump_fn: unicode|str
     :rtype : generator
     """
+    counter = 0
     with BZ2File(dump_fn) as f:
+
         for _, element in etree.iterparse(f):
             no_ns_elt = remove_ns(element)
 
@@ -185,7 +191,9 @@ def iterator(dump_fn):
 
                 if data['revision.text'][0:9] == '#REDIRECT':
                     continue
-
+                counter += 1
+                if 0 < num_articles <= counter:
+                    return
                 yield data
 
 
@@ -196,15 +204,17 @@ class WikipediaDataset(Dataset):
 
     Downloading archives from the Wikipedia dump site is too slow so the dump archive must be
     downloaded manually and passed to the constructor.
+    Optionally pass a second argument for the number of articles to extract
     """
-    def __init__(self, dump_fn, **kwargs):
-        super(WikipediaDataset, self).__init__(dataset_fn=dump_fn, **kwargs)
+    def __init__(self, dump_fn, num_articles=0, **kwargs):
+        self.num_articles = num_articles
+        super(WikipediaDataset, self).__init__(dataset_fn=dump_fn,  **kwargs)
 
     def install(self, es=None):
         raise NotImplementedError("Wikipedia dumps are too large to install automatically")
 
     def _iterator(self):
-        return iterator(self.dataset_fn)
+        return iterator(self.dataset_fn, self.num_articles)
 
 
 # From WikiExtractor.py
@@ -608,10 +618,11 @@ class Extractor(object):
         logging.info("%s\t%s", self.id, self.title)
         text = ''.join(self.page)
         url = get_url(self.id)
-        header = '<doc id="%s" url="%s" title="%s">\n' % (self.id, url, self.title)
+     #   header = '<doc id="%s" url="%s" title="%s">\n' % (self.id, url, self.title)
+
         # Separate header from text with a newline.
-        header += self.title + '\n\n'
-        header = header.encode('utf-8')
+        #header += self.title + '\n\n'
+        #header = header.encode('utf-8')
         self.magicWords['pagename'] = self.title
         self.magicWords['fullpagename'] = self.title
         self.magicWords['currentyear'] = time.strftime('%Y')
@@ -620,14 +631,15 @@ class Extractor(object):
         self.magicWords['currenthour'] = time.strftime('%H')
         self.magicWords['currenttime'] = time.strftime('%H:%M:%S')
         text = clean(self, text)
-        footer = "\n</doc>\n"
+        #footer = "\n</doc>\n"
         if out != sys.stdout:
-            out.reserve(len(header) + len(text) + len(footer))
-        out.write(header)
+         #   out.reserve(len(header) + len(text) + len(footer))
+           out.reserve(len(text))
+        #out.write(header)
         for line in compact(text):
             out.write(line.encode('utf-8'))
             out.write('\n')
-        out.write(footer)
+    #    out.write(footer)
 
     # ----------------------------------------------------------------------
     # Expand templates

@@ -186,7 +186,10 @@ class Dataset:
         count = 0
 
         for doc in self:
-            docs += [{'index': {'_index': self.es_index, '_type': self.es_doc_type}}, doc]
+            if '_id' in  doc:
+                docs += [{'index': dict(_index=self.es_index, _type=self.es_doc_type, _id=doc['_id'])}, doc]
+            else:
+                docs += [{'index': {'_index': self.es_index, '_type': self.es_doc_type }}, doc]
             count += 1
 
             if len(docs) % (2 * BULK_REQUEST_SIZE) == 0:
