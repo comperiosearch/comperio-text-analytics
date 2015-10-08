@@ -24,10 +24,7 @@ Intended for testing and other lightweight purposes with transient data.
 TODO Faster Elasticsearch startup.
 """
 
-# TODO put files outside the package directory?
-EMBEDDED_ES_FOLDER = os.path.join(package_path(), 'temp', 'embedded-es')
 
-# TODO add support for mutiple versions
 ES_DEFAULT_VERSION = '1.7.2'
 
 ES_URLS = {'1.7.2': 'https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.7.2.zip',
@@ -169,14 +166,23 @@ class ElasticsearchRunner:
     def __init__(self, install_path=None, transient=False, version=None):
         """
         :param install_path: The path where the Elasticsearch software package and data storage will be kept.
+        If no install path set, installs into APPDATA (windows)or  HOME/.elasticsearch_runner (other)
+        Install_path can be provided as the environment variable 'elasticsearch-runner-install-path'
+        If environment variable provided it will override install_path parameter
         :type install_path: str|unicode
         :param transient: Not implemented.
         :type transient: bool
         """
+        if os.getenv('elasticsearch-runner-install-path'):
+            install_path = os.getenv('elasticsearch-runner-install-path')
+
         if install_path:
             self.install_path = install_path
         else:
-            self.install_path = EMBEDDED_ES_FOLDER
+            if os.name == 'nt':
+                self.install_path = os.path.join(os.getenv("APPDATA"), 'elasticsearch_runner', 'embedded-es')
+            else:
+                self.install_path = os.path.join(os.getenv("HOME"), '.elasticsearch_runner', 'embedded-es')
         if version:
             self.version = version
         else:
