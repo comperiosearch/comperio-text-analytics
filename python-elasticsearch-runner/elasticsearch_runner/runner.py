@@ -85,6 +85,10 @@ def check_java():
     :rtype : bool
     :return: True if Java available on the command line
     """
+    java_home = os.getenv("JAVA_HOME")
+    if not os.path.exists(java_home):
+        logging.warn("java_home not set to an existing directory")
+        return False
     return os.system('java -version') == 0
 
 
