@@ -29,7 +29,7 @@ ES_DEFAULT_VERSION = '1.7.2'
 
 ES_URLS = {'1.7.2': 'https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.7.2.zip',
            '2.0.0-rc1': 'https://download.elasticsearch.org/elasticsearch/release/org/elasticsearch/distribution/zip/elasticsearch/2.0.0-rc1/elasticsearch-2.0.0-rc1.zip'}
-
+ES_DEFAULT_URL_LOCATION = 'https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch'
 
 def fn_from_url(url):
     """
@@ -203,7 +203,11 @@ class ElasticsearchRunner:
         :rtype : ElasticsearchRunner
         :return: The instance called on.
         """
-        es_archive_fn = download_file(ES_URLS[self.version], self.install_path)
+        if self.version in ES_URLS:
+            es_archive_fn = download_file(ES_URLS[self.version], self.install_path)
+        else:
+            download_url = "%s-%s.zip" %  (ES_DEFAULT_URL_LOCATION, self.version)
+            es_archive_fn = download_file(download_url, self.install_path)
 
         if not os.path.exists(os.path.join(self.install_path, self.version_folder)):
             with ZipFile(es_archive_fn, "r") as z:

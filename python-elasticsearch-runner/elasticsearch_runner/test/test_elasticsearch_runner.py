@@ -95,28 +95,54 @@ class TestElasticsearchRunner(TestCase):
                          ['/bin/sh', os.path.sep.join(['fakepath', runner.version_folder, 'bin', 'elasticsearch'])])
 
     def test_run_version2(self):
-            es_version = '2.0.0-rc1'
-            self.runner = ElasticsearchRunner(version=es_version)
-            self.runner.install()
-            self.runner.run()
-            self.runner.wait_for_green()
+        es_version = '2.0.0-rc1'
+        self.runner = ElasticsearchRunner(version=es_version)
+        self.runner.install()
+        self.runner.run()
+        self.runner.wait_for_green()
 
-            self.assertTrue(self.runner.is_running())
+        self.assertTrue(self.runner.is_running())
 
-            health_resp = requests.get('http://localhost:%d/_cluster/health' % self.runner.es_state.port)
-            self.assertEqual(200, health_resp.status_code)
-            health_data = json.loads(health_resp.text)
-            self.assertEqual(health_data['status'], 'green')
-            status = requests.get('http://localhost:%d' % self.runner.es_state.port)
-            status_data = json.loads(status.text)
-            self.assertEqual(status_data['version']['number'], es_version)
-            server_pid = self.runner.es_state.server_pid
+        health_resp = requests.get('http://localhost:%d/_cluster/health' % self.runner.es_state.port)
+        self.assertEqual(200, health_resp.status_code)
+        health_data = json.loads(health_resp.text)
+        self.assertEqual(health_data['status'], 'green')
+        status = requests.get('http://localhost:%d' % self.runner.es_state.port)
+        status_data = json.loads(status.text)
+        self.assertEqual(status_data['version']['number'], es_version)
+        server_pid = self.runner.es_state.server_pid
 
-            self.runner.stop()
+        self.runner.stop()
 
-            self.assertFalse(process_exists(server_pid))
-            self.assertFalse(self.runner.is_running())
-            self.assertIsNone(self.runner.es_state)
+        self.assertFalse(process_exists(server_pid))
+        self.assertFalse(self.runner.is_running())
+        self.assertIsNone(self.runner.es_state)
+
+    def test_run_version15(self):
+        es_version = '1.5.2'
+        self.runner = ElasticsearchRunner(version=es_version)
+        self.runner.install()
+        self.runner.run()
+        self.runner.wait_for_green()
+
+        self.assertTrue(self.runner.is_running())
+
+        health_resp = requests.get('http://localhost:%d/_cluster/health' % self.runner.es_state.port)
+        self.assertEqual(200, health_resp.status_code)
+        health_data = json.loads(health_resp.text)
+        self.assertEqual(health_data['status'], 'green')
+        status = requests.get('http://localhost:%d' % self.runner.es_state.port)
+        status_data = json.loads(status.text)
+        self.assertEqual(status_data['version']['number'], es_version)
+        server_pid = self.runner.es_state.server_pid
+
+        self.runner.stop()
+
+        self.assertFalse(process_exists(server_pid))
+        self.assertFalse(self.runner.is_running())
+        self.assertIsNone(self.runner.es_state)
+
+
 
     def test_parse_log_header_esv2_format(self):
         testStream = io.StringIO()
