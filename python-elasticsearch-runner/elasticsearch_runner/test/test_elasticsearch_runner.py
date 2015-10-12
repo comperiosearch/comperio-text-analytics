@@ -87,8 +87,8 @@ class TestElasticsearchRunner(TestCase):
         self.assertIsNone(self.runner2.es_state)
 
     def test_es_wrapper_call(self):
+        #NB! beware that if the environment variable 'elasticsearch-runner-install-path' is set this test will fail
         runner = ElasticsearchRunner(install_path='fakepath')
-
         self.assertEqual(runner._es_wrapper_call('nt'),
                          [os.path.sep.join(['fakepath', runner.version_folder, 'bin', 'elasticsearch.bat'])])
         self.assertEqual(runner._es_wrapper_call('posix'),
