@@ -192,7 +192,7 @@ def iterator(dump_fn, num_articles):
                 if data['revision.text'][0:9] == '#REDIRECT':
                     continue
                 counter += 1
-                if 0 < num_articles <= counter:
+                if 0 < num_articles < counter:
                     return
                 yield data
 
