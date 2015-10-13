@@ -24,13 +24,12 @@ Intended for testing and other lightweight purposes with transient data.
 TODO Faster Elasticsearch startup.
 """
 
-# TODO put files outside the package directory?
-EMBEDDED_ES_FOLDER = os.path.join(package_path(), 'temp', 'embedded-es')
 
-# TODO add support for mutiple versions
-ES_DEFAULT_VERSION = '1.7'
-ES_URLS = {'1.7': 'https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.7.1.zip'}
+ES_DEFAULT_VERSION = '1.7.2'
 
+ES_URLS = {'1.7.2': 'https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.7.2.zip',
+           '2.0.0-rc1': 'https://download.elasticsearch.org/elasticsearch/release/org/elasticsearch/distribution/zip/elasticsearch/2.0.0-rc1/elasticsearch-2.0.0-rc1.zip'}
+ES_DEFAULT_URL_LOCATION = 'https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch'
 
 def fn_from_url(url):
     """
@@ -71,7 +70,7 @@ def download_file(url, dest_path):
         r = requests.get(url, stream=True)
         with open(full_fn, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
-                if chunk: # filter out keep-alive new chunks
+                if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
                     f.flush()
 
@@ -141,7 +140,7 @@ def parse_es_log_header(log_file, limit=200):
         if m:
             server_pid = int(m.group(1))
 
-        m = re.search('\[http.*:(\d+)\]\}', line)
+        m = re.search('\[http.*publish_address.*:(\d+)[\]\}|\}]', line)
         if m:
             es_port = int(m.group(1))
 
@@ -164,18 +163,31 @@ class ElasticsearchRunner:
     Runs a basic single node Elasticsearch instance for testing or other lightweight purposes.
     """
 
-    def __init__(self, install_path=None, transient=False):
+    def __init__(self, install_path=None, transient=False, version=None):
         """
         :param install_path: The path where the Elasticsearch software package and data storage will be kept.
+        If no install path set, installs into APPDATA (windows)or  HOME/.elasticsearch_runner (other)
+        Install_path can be provided as the environment variable 'elasticsearch-runner-install-path'
+        If environment variable provided it will override install_path parameter
         :type install_path: str|unicode
         :param transient: Not implemented.
         :type transient: bool
         """
+        if os.getenv('elasticsearch-runner-install-path'):
+            install_path = os.getenv('elasticsearch-runner-install-path')
+
         if install_path:
             self.install_path = install_path
         else:
-            self.install_path = EMBEDDED_ES_FOLDER
-
+            if os.name == 'nt':
+                self.install_path = os.path.join(os.getenv("APPDATA"), 'elasticsearch_runner', 'embedded-es')
+            else:
+                self.install_path = os.path.join(os.getenv("HOME"), '.elasticsearch_runner', 'embedded-es')
+        if version:
+            self.version = version
+        else:
+            self.version = ES_DEFAULT_VERSION
+        self.version_folder = "elasticsearch-%s" % self.version
         self.transient = transient
         self.es_state = None
         self.es_config = None
@@ -191,15 +203,19 @@ class ElasticsearchRunner:
         :rtype : ElasticsearchRunner
         :return: The instance called on.
         """
-        es_archive_fn = download_file(ES_URLS[ES_DEFAULT_VERSION], self.install_path)
+        if self.version in ES_URLS:
+            es_archive_fn = download_file(ES_URLS[self.version], self.install_path)
+        else:
+            download_url = "%s-%s.zip" %  (ES_DEFAULT_URL_LOCATION, self.version)
+            es_archive_fn = download_file(download_url, self.install_path)
 
-        if not os.path.exists(os.path.join(self.install_path, 'elasticsearch-1.7.1')):
+        if not os.path.exists(os.path.join(self.install_path, self.version_folder)):
             with ZipFile(es_archive_fn, "r") as z:
                 z.extractall(self.install_path)
 
         # insert basic config file
         copyfile(os.path.join(package_path(), 'resources', 'embedded_elasticsearch.yml'),
-                 os.path.join(self.install_path, 'elasticsearch-1.7.1', 'config', 'elasticsearch.yml'))
+                 os.path.join(self.install_path, self.version_folder, 'config', 'elasticsearch.yml'))
 
         return self
 
@@ -218,7 +234,7 @@ class ElasticsearchRunner:
             data_path = mkdtemp(prefix='%s-data-' % cluster_name, dir=self.install_path)
 
             self.es_config = generate_config(cluster_name=cluster_name, data_path=data_path)
-            config_fn = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'config',
+            config_fn = os.path.join(self.install_path, self.version_folder, 'config',
                                      'elasticsearch-%s.yml' % cluster_name)
 
             with open(config_fn, 'w') as f:
@@ -226,7 +242,7 @@ class ElasticsearchRunner:
 
             # create the log file if it doesn't exist yet. We need to open it and seek to to the end before
             # sniffing out the configuration info from the log.
-            es_log_dir = os.path.join(self.install_path, 'elasticsearch-1.7.1', 'logs')
+            es_log_dir = os.path.join(self.install_path, self.version_folder, 'logs')
             es_log_fn = os.path.join(es_log_dir, '%s.log' % cluster_name)
 
             try:
@@ -246,10 +262,10 @@ class ElasticsearchRunner:
             server_pid, es_port = parse_es_log_header(es_log_f)
 
             if not server_pid:
-                logging.warn('Server PID not detected ...')
+                logging.error('Server PID not detected ...')
 
             if not es_port:
-                logging.warn('Server http port not detected ...')
+                logging.error('Server http port not detected ...')
 
             self.es_state = ElasticsearchState(wrapper_pid=wrapper_proc.pid,
                                                server_pid=server_pid,
@@ -265,9 +281,9 @@ class ElasticsearchRunner:
         :return:
         """
         if os_name == 'nt':
-            es_bin = [os.path.join(self.install_path, 'elasticsearch-1.7.1', 'bin', 'elasticsearch.bat')]
+            es_bin = [os.path.join(self.install_path, self.version_folder, 'bin', 'elasticsearch.bat')]
         else:
-            es_bin = ['/bin/sh', os.path.join(self.install_path, 'elasticsearch-1.7.1', 'bin', 'elasticsearch')]
+            es_bin = ['/bin/sh', os.path.join(self.install_path, self.version_folder, 'bin', 'elasticsearch')]
 
         return es_bin
 
