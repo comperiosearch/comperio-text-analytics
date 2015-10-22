@@ -12,7 +12,7 @@ from es_text_analytics.data.elasticsearch_dataset import ElasticsearchDataset
 
 from nltk.corpus import stopwords
 import re
-
+import time
 
 def fast_tokenize(str):
     return re.findall('[^\W\d_]+', str, re.MULTILINE | re.UNICODE)
@@ -33,7 +33,7 @@ def main():
     parser.add_argument('--n-topics', default=10, help='Number of topics to model.')
     parser.add_argument('--context', default='document', help='Context (document or sentence).')
     parser.add_argument('-q', '--query', default=None, help='Elasticsearch: Query to use to fetch documents')
-    parser.add_argument('--index', default='wiki', help='Elasticsearch: index to read from.')
+    parser.add_argument('--index',  help='Elasticsearch: index to read from.')
     parser.add_argument('--doc_type', default='doc', help='Elasticsearch: data type in index.')
 
     opts = parser.parse_args()
@@ -55,22 +55,26 @@ def main():
     logging.info("Using model type %s" % model_type)
 
     dump_fn = opts.dump_file
-    limit = int(opts.limit)
-    if not dump_fn and data_type in ['wiki']:
-        logging.error('--dump-file required for wiki dataset')
-        sys.exit(1)
-    if not limit:
-        limit = None
-
-    query = opts.query
-    index = opts.index
-    doc_type = opts.doc_type
 
     data_type = opts.dataset.lower()
     if data_type not in ['es', 'wiki']:
         logging.error("Invalid dataset  type %s" % data_type)
         parser.print_usage()
         exit(-1)
+    limit = None
+    if opts.limit:
+        limit = int(opts.limit)
+    if not dump_fn and data_type in ['wiki']:
+        logging.error('--dump-file required for wiki dataset')
+        sys.exit(1)
+
+    query = opts.query
+    index = opts.index
+    doc_type = opts.doc_type
+    if data_type == 'es' and index is None:
+        logging.error("Please be kind to at least specify the index you want to fetch from elasticsearch using the --index parameter")
+        sys.exit(1)
+
 
     n_topics = int(opts.n_topics)
 
@@ -101,30 +105,26 @@ def main():
     vocab.compactify()
     vocab.save(model_fn + '.vocab')
 
-    def get_corpus(arg_dataset):
-        return (vocab.doc2bow(doc) for doc
-                in ([token.lower() for token in fast_tokenize(page)
-                     if token not in sw]
-                    for page in arg_dataset))
 
-
-
-    class MyCorpus(object):
+    class IterableDataset(object):
         def __init__(self, args_dataset):
             self.dataset = args_dataset
+
         def __iter__(self):
             for page in self.dataset:
-                yield (vocab.doc2bow(doc) for doc in ([token.lower() for token in fast_tokenize(page)  if token not in sw]))
-
+                doc = [token.lower() for token in fast_tokenize(page) if token not in sw]
+                yield vocab.doc2bow(doc)
 
     if model_type == 'lsi':
-        model = LsiModel(corpus=get_corpus(dataset),
+        corpus = IterableDataset(dataset)
+        corpus.dictionary = vocab
+        model = LsiModel(corpus=corpus, num_topics=n_topics,
                          id2word=vocab)
     elif model_type == 'lda':
-        coprus = MyCorpus(dataset)
-        coprus.dictionary = vocab
-        model = LdaModel(corpus=coprus,
-                         id2word=vocab, passes=1)
+        corpus = IterableDataset(dataset)
+        corpus.dictionary = vocab
+        model = LdaModel(corpus=corpus, num_topics=n_topics,
+                         id2word=vocab)
 
     # elif model_type == 'word2vec':
     # model =
