@@ -115,15 +115,13 @@ def main():
     else:
         logging.info("Using data type %s with dump_file %s and limit %s" % (data_type, dump_fn, limit))
         dataset = WikipediaDataset(dump_fn=dump_fn, num_articles=limit, normalize_func=normalize_wiki)
-    dataset = WikipediaDataset(dump_fn=dump_fn, num_articles=limit)
-
+    
     vocab = Dictionary()
 
     sw = set(stopwords.words('norwegian'))
 
     vocab.add_documents(([token.lower() for token in fast_tokenize(page)
-    vocab.add_documents(([token.lower() for token in fast_tokenize(page['article.text'])
-                          if token not in sw]
+                              if token not in sw]
                          for page in dataset))
     vocab.filter_extremes()
     vocab.compactify()
