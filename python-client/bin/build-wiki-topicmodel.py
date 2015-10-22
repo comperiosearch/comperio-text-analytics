@@ -25,7 +25,7 @@ def normalize_wiki(doc):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('-ds', '--dataset', default='wiki', help='What kind of dataset to use. wiki or es')
+    parser.add_argument('-ds', '--dataset', default='wiki', help='What kind of dataset to use. (wiki or es)')
     parser.add_argument('-d', '--dump-file', help='Wiki: bz2 dump file with wiki in it')
     parser.add_argument('-l', '--limit', help='Wiki: How many documents to scrape from wiki')
     parser.add_argument('--model-id', default='model', help='Filename for created model.')
@@ -107,27 +107,33 @@ def main():
 
 
     class IterableDataset(object):
-        def __init__(self, args_dataset):
+        def __init__(self, args_dataset, doc2bow=True):
             self.dataset = args_dataset
+            self.doc2bow = doc2bow
 
         def __iter__(self):
             for page in self.dataset:
                 doc = [token.lower() for token in fast_tokenize(page) if token not in sw]
-                yield vocab.doc2bow(doc)
+                if self.doc2bow:
+                    yield vocab.doc2bow(doc)
+                else:
+                    yield doc
 
     if model_type == 'lsi':
         corpus = IterableDataset(dataset)
-        corpus.dictionary = vocab
         model = LsiModel(corpus=corpus, num_topics=n_topics,
                          id2word=vocab)
     elif model_type == 'lda':
         corpus = IterableDataset(dataset)
-        corpus.dictionary = vocab
         model = LdaModel(corpus=corpus, num_topics=n_topics,
                          id2word=vocab)
 
-    # elif model_type == 'word2vec':
-    # model =
+    elif model_type == 'word2vec':
+        corpus = IterableDataset(dataset, doc2bow=False)
+        corpus.dictionary = vocab
+        model = Word2Vec(sentences=corpus)
+        print model.most_similar(positive=['kvinne', 'konge'], negative=['mann'], topn=2)
+        print model.doesnt_match("oslo akershus regjerningen drammen".split())
 
     print model
     model.save(model_fn)
