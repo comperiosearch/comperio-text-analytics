@@ -14,7 +14,21 @@ CFG = {
     ('ADJ', 'SUBST'): 'SUBSTP',
     }
 
-def extract(tagged_tokens):
+
+def force_list(item):
+    """
+    Wrapped the passed argument in a list if it is not a list.
+
+    :param item: Anything.
+    :return: List wrapping any non list item passed.
+    """
+    if not isinstance(item, list):
+        return [item]
+    else:
+        return item
+
+
+def extract(tagged_tokens, keep_index=False):
     """
     Extracted NP chunks from a tagged sequence of tokens.
 
@@ -22,8 +36,11 @@ def extract(tagged_tokens):
 
     :param tagged_tokens: A sequence of token/tag pairs from the NNO or NOB tagger.
     :type tagged_tokens: list[(str|unicode, str|unicode)]
-    :rtype : list[str|unicode]
-    :return: A list of NP chunks as strings with the complete phrase.
+    :param keep_index: Return token index positions for chunks.
+    :type keep_index: bool
+    :rtype : list[str|unicode|list[str|unicode]|(str|unicode|list[str|unicode], int)]
+    :return: A list of NP chunks as strings with the complete phrase. Chunks can be strings for single token chunks,
+      list of strings for ultiple tokens or a chunk/index tuple if keep_index is set to true.
     """
     merge = True
     while merge:
@@ -38,12 +55,28 @@ def extract(tagged_tokens):
                 merge = True
                 tagged_tokens.pop(x)
                 tagged_tokens.pop(x)
-                match = '%s %s' % (t1[0], t2[0])
+                match = force_list(t1[0]) + force_list(t2[0])
                 pos = value
+                # noinspection PyTypeChecker
                 tagged_tokens.insert(x, (match, pos))
                 break
 
-    matches = [t[0] for t in tagged_tokens if t[1] in ['SUBST', 'SUBST_PROP', 'SUBSTP']]
+    matches = []
+    index = 0
+
+    for t in tagged_tokens:
+        if t[1] in ['SUBST', 'SUBST_PROP', 'SUBSTP']:
+            if keep_index:
+                value = (t[0], index)
+            else:
+                value = t[0]
+
+            matches.append(value)
+
+        if isinstance(t, list):
+            index += len(t)
+        else:
+            index += 1
 
     return matches
 
@@ -60,16 +93,18 @@ class NONPExtractor(BaseNPExtractor):
         """
         self.tagger = tagger
 
-    def extract(self, tokens):
+    def extract(self, tokens, keep_index=False):
         """
         Extract NP chunks from passed tokens.
 
         :param tokens: Tokens as untagged string or pretagged list of token/tag pairs according to tagger configuration.
         :type tokens: str|list[(str|unicode, str|unicode)]
+        :param keep_index: Return token index positions for chunks.
+        :type keep_index: bool
         :rtype : list[str|unicode]
         :return:
         """
         if self.tagger:
             tokens = self.tagger.tag(tokens)
 
-        return extract(tokens)
+        return extract(tokens, keep_index=keep_index)
