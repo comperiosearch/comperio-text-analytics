@@ -9,6 +9,6 @@ setup(
     author='Andre Lynum',
     author_email='andre.lynum@comperiosearch.com',
     description='es text analytics.',
-    install_requires=['elasticsearch', 'requests', 'psutil', 'codecs', 'textblob', 'nltk', 'abc','gensim', 'uniseg'],
+    install_requires=['elasticsearch', 'requests', 'psutil',  'textblob', 'nltk',  'gensim', 'uniseg'],
 
 )
