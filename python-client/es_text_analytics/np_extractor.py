@@ -85,26 +85,27 @@ class NONPExtractor(BaseNPExtractor):
     """
     Simple NP extractor similar to FastNPEXtractor in TextBlob.
     """
-    def __init__(self, tagger=None):
+    def __init__(self, tagger=None, keep_index=False):
         """
         :param tagger: If initialized a tagger instance extract arguments will be processed with this tagger.
           Otherwise the extract method expects tagged input.
         :type tagger: None|textblob.base.BaseTagger
+        :param keep_index: Return token index positions for chunks.
+        :type keep_index: bool
         """
         self.tagger = tagger
+        self.keep_index = keep_index
 
-    def extract(self, tokens, keep_index=False):
+    def extract(self, tokens):
         """
         Extract NP chunks from passed tokens.
 
         :param tokens: Tokens as untagged string or pretagged list of token/tag pairs according to tagger configuration.
         :type tokens: str|list[(str|unicode, str|unicode)]
-        :param keep_index: Return token index positions for chunks.
-        :type keep_index: bool
         :rtype : list[str|unicode]
         :return:
         """
         if self.tagger:
             tokens = self.tagger.tag(tokens)
 
-        return extract(tokens, keep_index=keep_index)
+        return extract(tokens, keep_index=self.keep_index)
