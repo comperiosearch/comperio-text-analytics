@@ -15,10 +15,10 @@ import threading
 import os.path
 from bz2 import BZ2File
 import io
-import wiki_infobox
 
 from lxml import etree
 
+import wiki_infobox
 from es_text_analytics.data.dataset import Dataset
 
 """
@@ -615,7 +615,7 @@ class Extractor(object):
         self.frame = []
 
     def extract(self, out=sys.stdout):
-        logging.info("%s\t%s", self.id, self.title)
+        logging.debug("%s\t%s", self.id, self.title)
         text = ''.join(self.page)
         url = get_url(self.id)
      #   header = '<doc id="%s" url="%s" title="%s">\n' % (self.id, url, self.title)
