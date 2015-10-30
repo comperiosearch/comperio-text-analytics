@@ -15,10 +15,10 @@ import threading
 import os.path
 from bz2 import BZ2File
 import io
-import wiki_infobox
 
 from lxml import etree
 
+import wiki_infobox
 from es_text_analytics.data.dataset import Dataset
 
 """
