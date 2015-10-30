@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import re
 import sys
 import re
-
+from gensim import corpora
 from gensim.corpora import Dictionary
 from gensim.models.lsimodel import LsiModel
 from gensim.models.ldamodel import LdaModel
@@ -32,7 +32,6 @@ def get_tokenized(page, sw):
     return [token.lower() for token in fast_tokenize(page) if token not in sw and len(token) > 1]
 
 
-
 class IterableDataset(object):
     def __init__(self, args_dataset, stopwords, vocabulary, doc2bow=True):
         self.dataset = args_dataset
@@ -52,30 +51,25 @@ class IterableDataset(object):
                 yield doc
 
 
-
+# wikidata download https://dumps.wikimedia.org/nowiki/latest/nowiki-latest-pages-articles.xml.bz2
 def main():
     parser = ArgumentParser(
         description='wrapper script for churning datasets of wiki or elasticsearch kind through gensim to produce topic models please see gensim documentation for more information')
     parser.add_argument('-ds', '--dataset', default='wiki', help='What kind of dataset to use. (wiki or es)')
     parser.add_argument('-d', '--dump-file', help='Wiki: bz2 dump file with wiki in it')
-    parser.add_argument('-l', '--limit', help='Wiki: How many documents to scrape from wiki')
+    parser.add_argument('-l', '--limit', help='Wiki: How many documents to extract from wiki')
     parser.add_argument('--model-id', default='model', help='Filename for created model.')
     parser.add_argument('--model-type', default='lsi', help='Model type (lsi, lda, word2vec, hdp).')
     parser.add_argument('--n-topics', default=10, help='Number of topics to model.')
-    parser.add_argument('--context', default='document', help='Context (document or sentence).')
+    parser.add_argument('--w2v-size', default=100, help='size of Word2Vec context.')
+    parser.add_argument('--w2v-window',  default=5, help='window for Word2Vec.')
     parser.add_argument('-q', '--query', default=None, help='Elasticsearch: Query to use to fetch documents')
     parser.add_argument('--index', help='Elasticsearch: index to read from.')
     parser.add_argument('--doc_type', default='doc', help='Elasticsearch: data type in index.')
+    parser.add_argument('--data-dir', help='Directory to save the generated models and vocabularies into.')
+    parser.add_argument('--vocab',  help='Prebuilt Vocabulary file. Use this to avoid having to generate one.')
 
     opts = parser.parse_args()
-
-    context = opts.context.lower()
-
-    if context not in ['sentence', 'document']:
-        logging.error("Invalid context %s" % context)
-        parser.print_usage()
-        exit(-1)
-    logging.info("Using %s contexts." % context)
 
     model_type = opts.model_type.lower()
     if model_type not in ['lsi', 'lda', 'word2vec', 'hdp']:
@@ -109,32 +103,35 @@ def main():
         sys.exit(1)
 
     n_topics = int(opts.n_topics)
-
     logging.info("Using %d topics." % n_topics)
-
+    data_dir = opts.data_dir
     model_id = opts.model_id
-    model_fn = '%s_%s_%d_%s' % (model_id, model_type, n_topics, context)
-
+    model_fn = '%s_%s_%d' % (model_id, model_type, n_topics)
+    if data_dir:
+        model_fn = '%s/%s' % (data_dir, model_fn)
+    if model_type == 'word2vec':
+        w2v_size = int(opts.w2v_size)
+        w2v_window = int(opts.w2v_window)
+        model_fn = '%s_w_%s_s_%s' % (model_fn, w2v_window, w2v_size)
     logging.info("Writing models to %s." % model_fn)
 
     if data_type == 'es':
         logging.info("Using data type %s with index %s, doc_type %s query %s" % (data_type, index, doc_type, query))
         dataset = ElasticsearchDataset(read_index=index, read_doc_type=doc_type, query=query,
                                        normalize_func=normalize_es)
-
     else:
         logging.info("Using data type %s with dump_file %s and limit %s" % (data_type, dump_fn, limit))
         dataset = WikipediaDataset(dump_fn=dump_fn, num_articles=limit, normalize_func=normalize_wiki)
-
+    vocab_file = opts.vocab
     vocab = Dictionary()
     sw = set(stopwords.words('norwegian'))
-    if 21 == 21:
+    if not vocab_file:
         vocab.add_documents([get_tokenized(page, sw) for page in dataset])
         vocab.filter_extremes()
         vocab.compactify()
         vocab.save(model_fn + '.vocab')
     else:
-        vocab.load('wiki.vocab')
+        vocab = Dictionary.load(vocab_file)
 
     tfidf = TfidfModel(dictionary=vocab)
     if model_type == 'lsi':
@@ -149,25 +146,27 @@ def main():
     elif model_type == 'word2vec':
         corpus = IterableDataset(dataset, sw, vocab, doc2bow=False)
         corpus.dictionary = vocab
-        model = Word2Vec(sentences=corpus)
-        print model.most_similar(positive=['kvinne', 'konge'], negative=['mann'], topn=2)
-        print model.doesnt_match("oslo akershus regjerningen drammen".split())
+        model = Word2Vec(sentences=corpus, window=w2v_window, size=w2v_size)
     elif model_type == 'hdp':
         corpus = IterableDataset(dataset, sw, vocab)
         model = HdpModel(corpus=tfidf[corpus], id2word=vocab)
-        print model.show_topics()
 
-    print model
+    logging.info(model)
     model.save(model_fn)
+    corpora.MmCorpus.serialize("%s.corp" % (model_fn), tfidf[corpus])
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-
+    logformat = '%(asctime)s %(name)-12s: %(message)s'
+    logging.basicConfig(level=logging.INFO, format=logformat, filename='wiki-topicmodel.log' )
+    console = logging.StreamHandler()
+    formatter = logging.Formatter(logformat)
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
     main()
     # ########## sample usage
     #
     #--model-type=lda -d F:/projects/elasticsearch-enterprise-system/data/nowiki-20150901-pages-articles.xml.bz2 -l 100 --n-topics 10
     #--model-type=lda -ds es  --n-topics 10 --index wiki --query "{\"query\":{\"match\": {\"_all\":\"kongo\"}}}"
-    #--model-type=word2vec -ds es   --index wiki
+    #--model-type=word2vec -ds es   --index wiki --w2v_window=7 --w2v_size=75
     #--model-type=hdp -d F:/projects/elasticsearch-enterprise-system/data/nowiki-20150901-pages-articles.xml.bz2 -l 100 --n-topics 10
