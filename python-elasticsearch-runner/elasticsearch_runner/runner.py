@@ -351,6 +351,10 @@ class ElasticsearchRunner:
             logging.warn('Elasticsearch runner is not started ...')
             return self
 
+        if self.es_state.port is None:
+            logging.warn('Elasticsearch runner not properly started ...')
+            return self
+        
         end_time = clock() + timeout
         health_resp = requests.get('http://localhost:%d/_cluster/health' % self.es_state.port)
         health_data = json.loads(health_resp.text)
