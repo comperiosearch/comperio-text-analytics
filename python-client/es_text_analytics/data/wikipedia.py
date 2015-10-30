@@ -615,7 +615,7 @@ class Extractor(object):
         self.frame = []
 
     def extract(self, out=sys.stdout):
-        logging.info("%s\t%s", self.id, self.title)
+        logging.debug("%s\t%s", self.id, self.title)
         text = ''.join(self.page)
         url = get_url(self.id)
      #   header = '<doc id="%s" url="%s" title="%s">\n' % (self.id, url, self.title)
