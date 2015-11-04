@@ -8,11 +8,11 @@ import sys
 from subprocess import Popen, PIPE
 
 from nltk.tag.hunpos import HunposTagger
-
 from textblob.base import BaseTagger
 
 from es_text_analytics.data.dataset import project_path, download_file
 from es_text_analytics.tokenizer import NOTokenizer
+
 
 
 
@@ -159,7 +159,7 @@ FEATURES_MAP = {'universal': obt_to_universal_tag,
 
 def install_hunpos():
     """
-    Downloads and install system appropriate HunPos bunaries in the default location.
+    Downloads and install system appropriate HunPos binaries in the default location.
 
     :rtype : None
     """
@@ -307,6 +307,10 @@ def train_hunpos_model(seq, model_fn):
     return stats
 
 
+def clean_input(string):
+    return re.sub('\n', ' ', string)
+
+
 class NOBTagger (BaseTagger, object):
     """
     TextBlob compatible Norsk Bokmål POS tagger class based on the NLTK HunPos wrapper.
@@ -317,6 +321,8 @@ class NOBTagger (BaseTagger, object):
                                    hunpos_tag_bin(), encoding='utf-8')
 
     def tag(self, text, tokenize=True):
+        text = clean_input(text)
+
         if tokenize:
             text = self.tokenizer.tokenize(text)
 
@@ -333,6 +339,8 @@ class NNOTagger (BaseTagger, object):
                                    hunpos_tag_bin(), encoding='utf-8')
 
     def tag(self, text, tokenize=True):
+        text = clean_input(text)
+
         if tokenize:
             text = self.tokenizer.tokenize(text)
 
