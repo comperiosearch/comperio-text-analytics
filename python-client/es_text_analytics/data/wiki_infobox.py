@@ -51,10 +51,10 @@ def scrape_infobox(content):
             if '=' in item:
                 pair = item.split('=', 1)
                 field = pair[0].strip()
-                field = re.sub('\|', '', field)
+                field = re.sub('\W', '_', field)
                 value = pair[1].strip()
                 field = field.lower().strip()
-                if len(field) < 50:
+                if len(field) < 20:
                     if value != '':
                         data[field] = value
         return data
