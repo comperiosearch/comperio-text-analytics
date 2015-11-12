@@ -1,12 +1,12 @@
 # coding=utf-8
-from StringIO import StringIO
-from gzip import GzipFile
 import logging
 import os
 import re
+import unicodedata
+from StringIO import StringIO
+from gzip import GzipFile
 from tarfile import TarFile
 from zipfile import ZipFile
-import unicodedata
 
 from bs4 import BeautifulSoup
 
@@ -369,8 +369,9 @@ class AviskorpusDataset(Dataset):
     See http://www.nb.no/sprakbanken/show?serial=sbr-4&lang=nb for details.
     """
     def __init__(self, index='aviskorpus', doc_type='article', dataset_path=None,
-                 sections=None, sources=None):
-        super(AviskorpusDataset, self).__init__(index=index, doc_type=doc_type, dataset_path=dataset_path)
+                 sections=None, sources=None, dataset_fn=None):
+        super(AviskorpusDataset, self).__init__(index=index, doc_type=doc_type, dataset_path=dataset_path,
+                                                dataset_fn=dataset_fn)
 
         self.archive_fn = AVISKORPUS_ARCHIVE_URL
         
