@@ -194,6 +194,9 @@ def iterator(dump_fn, num_articles):
                 counter += 1
                 if 0 < num_articles < counter:
                     return
+                # filter out empty crap
+                if len(data['article.text']) < 30:
+                    continue
                 yield data
 
 

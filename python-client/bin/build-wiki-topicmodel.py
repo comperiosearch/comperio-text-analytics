@@ -17,7 +17,7 @@ from nltk.corpus import stopwords
 
 
 def fast_tokenize(str):
-    return re.findall('[^\W\d_]+', str, re.MULTILINE | re.UNICODE)
+    return [x.lower() for x in re.findall('[^\W\d_]+', str, re.MULTILINE | re.UNICODE)]
 
 
 def normalize_es(doc):
@@ -25,11 +25,11 @@ def normalize_es(doc):
 
 
 def normalize_wiki(doc):
-    return doc['article.text']
+      return doc['article.text']
 
 
 def get_tokenized(page, sw):
-    return [token.lower() for token in fast_tokenize(page) if token not in sw and len(token) > 1]
+      return [token for token in fast_tokenize(page) if token not in sw and len(token) > 1]
 
 
 class IterableDataset(object):
@@ -59,7 +59,7 @@ def main():
     parser.add_argument('-d', '--dump-file', help='Wiki: bz2 dump file with wiki in it')
     parser.add_argument('-l', '--limit', help='Wiki: How many documents to extract from wiki')
     parser.add_argument('--model-id', default='model', help='Filename for created model.')
-    parser.add_argument('--model-type', default='lsi', help='Model type (lsi, lda, word2vec, hdp).')
+    parser.add_argument('--model-type', default='lsi', help='Model type (lsi, lda, word2vec, hdp, vocabulary).')
     parser.add_argument('--n-topics', default=10, help='Number of topics to model.')
     parser.add_argument('--w2v-size', default=100, help='size of Word2Vec context.')
     parser.add_argument('--w2v-window',  default=5, help='window for Word2Vec.')
@@ -72,7 +72,7 @@ def main():
     opts = parser.parse_args()
 
     model_type = opts.model_type.lower()
-    if model_type not in ['lsi', 'lda', 'word2vec', 'hdp']:
+    if model_type not in ['lsi', 'lda', 'word2vec', 'hdp', 'vocabulary']:
         logging.error("Invalid model type %s" % model_type)
         parser.print_usage()
         exit(-1)
@@ -125,14 +125,15 @@ def main():
     vocab_file = opts.vocab
     vocab = Dictionary()
     sw = set(stopwords.words('norwegian'))
-    if not vocab_file:
+    if not vocab_file or model_type == 'vocabulary':
         vocab.add_documents([get_tokenized(page, sw) for page in dataset])
         vocab.filter_extremes()
         vocab.compactify()
         vocab.save(model_fn + '.vocab')
     else:
         vocab = Dictionary.load(vocab_file)
-
+    if model_type == 'vocabulary':
+        return
     tfidf = TfidfModel(dictionary=vocab)
     if model_type == 'lsi':
         corpus = IterableDataset(dataset, sw, vocab)
@@ -153,7 +154,7 @@ def main():
 
     logging.info(model)
     model.save(model_fn)
-    corpora.MmCorpus.serialize("%s.corp" % (model_fn), tfidf[corpus])
+    corpora.MmCorpus.serialize("%s.corp" % (model_fn), corpus)
 
 
 if __name__ == '__main__':
@@ -164,6 +165,7 @@ if __name__ == '__main__':
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
     main()
+
     # ########## sample usage
     #
     #--model-type=lda -d F:/projects/elasticsearch-enterprise-system/data/nowiki-20150901-pages-articles.xml.bz2 -l 100 --n-topics 10
