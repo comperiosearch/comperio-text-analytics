@@ -4,3 +4,5 @@ models/
 .idea/
 !python-client/es_text_analytics/data
 
+.vagrant/
+notebooks/

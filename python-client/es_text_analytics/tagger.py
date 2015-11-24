@@ -33,7 +33,7 @@ HUNPOS_URL_MAP = {
 HUNPOS_SUBDIR_MAP = {
     'win32': 'hunpos-1.0-win',
     'darwin': 'hunpos-1.0-macosx',
-    'linux': 'hunpos-1.0-linux'
+    'linux2': 'hunpos-1.0-linux'
 }
 
 
@@ -321,9 +321,9 @@ class NOBTagger (BaseTagger, object):
                                    hunpos_tag_bin(), encoding='utf-8')
 
     def tag(self, text, tokenize=True):
-        text = clean_input(text)
 
         if tokenize:
+            text = clean_input(text)
             text = self.tokenizer.tokenize(text)
 
         return self.tagger.tag(text)

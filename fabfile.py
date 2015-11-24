@@ -139,7 +139,8 @@ def install_self():
 def vagrant():
     env.user = 'vagrant'
     env.hosts = ['127.0.0.1:2222']
-    env.key_filename = '~/.vagrant.d/insecure_private_key'
+    #env.key_filename = '~/.vagrant.d/insecure_private_key'
+    env.key_filename = '.vagrant/machines/default/virtualbox/private_key'
     env.disable_known_hosts = True
 
 
