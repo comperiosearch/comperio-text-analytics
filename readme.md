@@ -1,4 +1,4 @@
-# Comperio text analytics
+# Comperio text analytics [![Build Status](https://travis-ci.org/comperiosearch/comperio-text-analytics.svg?branch=master)](https://travis-ci.org/comperiosearch/comperio-text-analytics)
 
 ElasticSearch based text analytics.
 
