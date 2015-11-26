@@ -10,4 +10,4 @@ script: nosetests
 virtualenv:
   system_site_packages: true
 before_install:
- - sudo apt-get install -qq python-numpy python-scipy
+ -  apt-get install -qq python-numpy python-scipy
