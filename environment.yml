@@ -1,0 +1,16 @@
+name: cta-env
+dependencies:
+- python
+- pip
+- ipython
+- ipython-notebook
+- matplotlib
+- scikit-learn
+- requests
+- gensim
+- nltk
+- nose
+- pip:
+  - textblob
+  - elasticsearch
+  - psutil
