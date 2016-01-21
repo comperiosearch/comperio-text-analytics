@@ -1,11 +1,11 @@
-from abc import abstractmethod
-from abc import ABCMeta
 import logging
 import os
+from abc import ABCMeta
+from abc import abstractmethod
 from urlparse import urlparse
 
-from elasticsearch.client import IndicesClient
 import requests
+from elasticsearch.client import IndicesClient
 
 BULK_REQUEST_SIZE = 100
 
@@ -161,8 +161,9 @@ class Dataset:
         raise NotImplementedError
 
     def __iter__(self):
-        if not self.dataset_fn:
-            raise ValueError()
+        if self.archive_fn:
+            if not self.dataset_fn:
+                raise ValueError()
 
         for doc in self._iterator():
             try:
@@ -225,11 +226,14 @@ class Dataset:
         :type es: None|elasticsearch.client.Elasticsearch
         :rtype : Dataset
         """
-        if self.dataset_fn:
-            logging.warn('Dataset initialized directly or already installed ...')
-            return self
+        if not self.archive_fn:
+            logging.info("No installable archive for this dataset ...")
         else:
-            self.dataset_fn = download_file(self.archive_fn, dest_path=self.dataset_path)
+            if self.dataset_fn:
+                logging.warn('Dataset initialized directly or already installed ...')
+                return self
+            else:
+                self.dataset_fn = download_file(self.archive_fn, dest_path=self.dataset_path)
 
         if es:
             logging.info("Creating Elasticsearch index %s ..." % self.index)
