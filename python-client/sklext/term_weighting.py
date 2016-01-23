@@ -1,7 +1,7 @@
 from scipy.sparse import spdiags
 from sklearn.base import BaseEstimator, TransformerMixin
 
-from sklext.mutual_information import mutual_information
+from sklext.mutual_information import mutual_information, pointwise_mutual_information
 
 
 class TermWeightTransformer(BaseEstimator, TransformerMixin):
@@ -10,7 +10,12 @@ class TermWeightTransformer(BaseEstimator, TransformerMixin):
         self._weights = None
 
     def fit(self, X, y):
-        self._weights = mutual_information(X, y)
+        if self.method is 'mi':
+            self._weights = mutual_information(X, y)
+        elif self.method is 'pmi':
+            self._weights = pointwise_mutual_information(X, y, normalize=False)
+        elif self.method is 'npmi':
+            self._weights = pointwise_mutual_information(X, y, normalize=True)
 
         return self
 
