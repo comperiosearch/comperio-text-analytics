@@ -5,8 +5,10 @@ from sklext.mutual_information import mutual_information, pointwise_mutual_infor
 
 
 class TermWeightTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, method='mi'):
+    def __init__(self, method='mi', pmi_k=2):
         self.method = method
+        self.pmi_k = pmi_k
+
         self._weights = None
 
     def fit(self, X, y):
@@ -16,6 +18,14 @@ class TermWeightTransformer(BaseEstimator, TransformerMixin):
             self._weights = pointwise_mutual_information(X, y, normalize=False)
         elif self.method is 'npmi':
             self._weights = pointwise_mutual_information(X, y, normalize=True)
+        elif self.method is 'ppmi_exp':
+            self._weights = pointwise_mutual_information(X, y, normalize=True, positive='exp')
+        elif self.method is 'pmi_k':
+            self._weights = pointwise_mutual_information(X, y, normalize=True, k_weight=self.pmi_k)
+        elif self.method is 'ppmi':
+            self._weights = pointwise_mutual_information(X, y, normalize=False, positive='cutoff')
+        else:
+            raise ValueError
 
         return self
 

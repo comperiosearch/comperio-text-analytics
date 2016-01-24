@@ -1,5 +1,5 @@
 from itertools import izip
-from math import log
+from math import log, e
 
 import numpy
 from numpy import array, sum, zeros
@@ -101,7 +101,7 @@ def mutual_information(X, y):
     return ig
 
 
-def pointwise_mutual_information(X, y, normalize=False):
+def pointwise_mutual_information(X, y, normalize=False, k_weight=None, positive=None):
     p_c = marginal_estimator(y)
     p_t = marginal_estimator(X)
 
@@ -110,9 +110,18 @@ def pointwise_mutual_information(X, y, normalize=False):
 
     p_t_c = joint_estimator_point(X, y, smoothing=True)
 
+    if k_weight:
+        p_t_c**k_weight
+
     m = numpy.log(array(p_t_c) / (p_t * p_c))
 
     if normalize:
         m = m / -numpy.log(p_t_c)
+
+    if positive is 'cutoff':
+        m[m < .0] = .0
+
+    if positive is 'exp':
+        m = e**m
 
     return array(numpy.max(m, axis=1)).flatten()
