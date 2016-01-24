@@ -14,3 +14,4 @@ dependencies:
   - textblob
   - elasticsearch
   - psutil
+  - py4j
