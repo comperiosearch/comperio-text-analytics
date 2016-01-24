@@ -1,91 +1,17 @@
-from itertools import izip
 from math import log, e
 
 import numpy
-from numpy import array, sum, zeros
-from scipy.sparse import issparse
+from numpy import array, zeros
 
-
-def add_smoothing(m, amount=10 ** -12):
-    m = m.astype(numpy.float)
-    m[m == 0] = amount
-
-    return m
-
-
-def marginal_estimator(X, axis=0):
-    N = X.shape[axis]
-
-    if issparse(X):
-        p = array((X > 0).sum(axis=axis)).flatten() / float(N)
-    else:
-        p = array(sum(X > 0, axis=axis)).flatten() / float(N)
-
-    p[p == 0] = 10 ** -12
-
-    return p
-
-
-def joint_estimator_point(X, y, smoothing=False):
-    counts = X.T.dot(y)
-
-    if issparse(counts):
-        counts = array(counts.todense())
-
-    if smoothing:
-        counts = add_smoothing(counts)
-
-    return counts / numpy.sum(counts, dtype=numpy.float)
-
-
-def joint_estimator_full_sparse(X, y, smoothing=False):
-    _, t = X.shape
-    _, c = y.shape
-
-    X = X.tolil()
-    y = y.tolil()
-
-    counts = [zeros((t, c)), zeros((t, c)), zeros((t, c)), zeros((t, c))]
-
-    for t_idx, c_idx in izip(X.rows, y.rows):
-        t_mask = zeros(t, dtype=numpy.bool)
-        t_mask[t_idx] = True
-        c_mask = zeros(c, dtype=numpy.bool)
-        c_mask[c_idx] = True
-
-        counts[0][t_mask, c_mask] += 1
-        counts[1][t_mask, ~c_mask] += 1
-        counts[2][~t_mask, c_mask] += 1
-        counts[3][~t_mask, ~c_mask] += 1
-
-    if smoothing:
-        counts = [add_smoothing(m) for m in counts]
-
-    total = numpy.sum([numpy.sum(m) for m in counts], dtype=numpy.float)
-
-    return [m / total for m in counts]
-
-
-def joint_estimator_full(X, y, smoothing=False):
-    if issparse(X) or issparse(y):
-        return joint_estimator_full_sparse(X, y, smoothing=smoothing)
-
-    counts = [xx.T.dot(yy) for xx, yy in zip([X, X, 1 - X, 1 - X], [y, 1 - y, y, 1 - y])]
-
-    if smoothing:
-        counts = [add_smoothing(m) for m in counts]
-
-    total = numpy.sum([numpy.sum(m) for m in counts], dtype=numpy.float)
-
-    return [m / total for m in counts]
+from sklext.term_estimators import marginal_estimator, joint_estimator_point, joint_estimator_full
 
 
 def mutual_information(X, y):
     num_terms = X.shape[1]
     num_classes = y.shape[1]
 
-    p_c = marginal_estimator(y)
-    p_t = marginal_estimator(X)
+    p_c = marginal_estimator(y, smoothing=True)
+    p_t = marginal_estimator(X, smoothing=True)
 
     p_t_c = joint_estimator_full(X, y, smoothing=True)
 
@@ -102,8 +28,8 @@ def mutual_information(X, y):
 
 
 def pointwise_mutual_information(X, y, normalize=False, k_weight=None, positive=None):
-    p_c = marginal_estimator(y)
-    p_t = marginal_estimator(X)
+    p_c = marginal_estimator(y, smoothing=True)
+    p_t = marginal_estimator(X, smoothing=True)
 
     p_t.shape = 2, 1
     p_c.shape = 1, 2
@@ -111,7 +37,7 @@ def pointwise_mutual_information(X, y, normalize=False, k_weight=None, positive=
     p_t_c = joint_estimator_point(X, y, smoothing=True)
 
     if k_weight:
-        p_t_c**k_weight
+        p_t_c = p_t_c**k_weight
 
     m = numpy.log(array(p_t_c) / (p_t * p_c))
 
