@@ -1,6 +1,7 @@
 from scipy.sparse import spdiags
 from sklearn.base import BaseEstimator, TransformerMixin
 
+from sklext.cond_prob import conditional_probabilities
 from sklext.mutual_information import mutual_information, pointwise_mutual_information
 
 
@@ -24,6 +25,10 @@ class TermWeightTransformer(BaseEstimator, TransformerMixin):
             self._weights = pointwise_mutual_information(X, y, normalize=True, k_weight=self.pmi_k)
         elif self.method is 'ppmi':
             self._weights = pointwise_mutual_information(X, y, normalize=False, positive='cutoff')
+        elif self.method is 'cp_raw':
+            self._weights = conditional_probabilities(X, y, ratio=False)
+        elif self.method is 'cp_ratio':
+            self._weights = conditional_probabilities(X, y, ratio=True)
         else:
             raise ValueError
 
