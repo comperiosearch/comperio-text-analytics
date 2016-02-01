@@ -6,4 +6,5 @@ SELF_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 mkdir -p ${SELF_DIR}\..\..\models
 
-python ${SELF_DIR}\build_no_tagger.py -m ${SELF_DIR}\..\..\models\no-tagger-default-model --features simple
+python ${SELF_DIR}\build_no_tagger.py -m ${SELF_DIR}\..\..\models\nob-tagger-default-model --features simple --language nob
+python ${SELF_DIR}\build_no_tagger.py -m ${SELF_DIR}\..\..\models\nno-tagger-default-model --features simple --language nno

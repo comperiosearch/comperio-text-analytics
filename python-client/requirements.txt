@@ -1,0 +1,8 @@
+elasticsearch
+requests
+psutil
+textblob
+nltk
+gensim
+uniseg
+git+git://github.com/comperiosearch/python-elasticsearch-runner

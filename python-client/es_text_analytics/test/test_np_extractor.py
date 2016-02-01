@@ -21,12 +21,12 @@ class TestNONPExtractor(TestCase):
                                             (u'hus', 'SUBST'),
                                             (u'.', 'PUNKT')]),
                          [[u'fine', u'hus']])
-
+        extractor = NONPExtractor(keep_index=True)
         self.assertEqual(extractor.extract([(u'Dette', 'PRON_PERS'),
                                             (u'er', 'VERB'),
                                             (u'vårt', 'DET'),
                                             (u'hus', 'SUBST'),
-                                            (u'.', 'PUNKT')], keep_index=True),
+                                            (u'.', 'PUNKT')]),
                          [(u'hus', 3)])
 
         self.assertEqual(extractor.extract([(u'Dette', 'PRON_PERS'),
@@ -34,5 +34,5 @@ class TestNONPExtractor(TestCase):
                                             (u'vårt', 'DET'),
                                             (u'fine', 'ADJ'),
                                             (u'hus', 'SUBST'),
-                                            (u'.', 'PUNKT')], keep_index=True),
+                                            (u'.', 'PUNKT')]),
                          [([u'fine', u'hus'], 3)])

@@ -10,5 +10,6 @@ setup(
     author_email='andre.lynum@comperiosearch.com',
     description='es text analytics.',
     install_requires=['elasticsearch', 'requests', 'psutil',  'textblob', 'nltk',  'gensim', 'uniseg'],
+    dependency_links=['git+ssh://git@github.com/comperiosearch/python-elasticsearch-runner']
 
 )

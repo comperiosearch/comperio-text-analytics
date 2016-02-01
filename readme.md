@@ -1,12 +1,12 @@
-# Comperio text analytics
+# Comperio text analytics [![Build Status](https://travis-ci.org/comperiosearch/comperio-text-analytics.svg?branch=master)](https://travis-ci.org/comperiosearch/comperio-text-analytics)
 
 ElasticSearch based text analytics.
 
 Implementation of:
 
-* Single document significant terms - [Trello board](https://trello.com/c/nrO8QIp9)
-* Classification - [Trello board](https://trello.com/c/PU7XqsTi)
-* Sentiment analysis - [Trello board](https://trello.com/c/C8H5fBcJ)
+* Single document significant terms - [Trello board](https://trello.com/c/nrO8QIp9) (private)
+* Classification - [Trello board](https://trello.com/c/PU7XqsTi) (private)
+* Sentiment analysis - [Trello board](https://trello.com/c/C8H5fBcJ) (private)
 
 ## Norwegian linguistics support for text analytics
 
@@ -88,6 +88,7 @@ dec = NOBDecompounder()
 dec.decompound(u'lampekostbatteri'), dec.decompound(u'søkekonsulenter')
 
 [u'lampe', u'kost', u'batteri'], [u'søke', u'konsulenter']
+
 ```
 
 ## Vagrant development server
@@ -102,42 +103,13 @@ fab vagrant provision_server
 
 #Installation notes
 
-Download ordbank_bm.zip from Comperio AWS S3 at https://console.aws.amazon.com/s3/home?region=eu-west-1#&bucket=language-resources&prefix=no/
-unzip into folder data/ordbank_bm
+To use the tagger, decompounder and lemmatizer you will need to download Norsk ordbank.
+You can download it by registering at [http://www.edd.uio.no/prosjekt/ordbanken/](http://www.edd.uio.no/prosjekt/ordbanken/)
 
-You need some modules, at least these
+You will need to build models for the tagger, by running:
 
-    pip install uniseg textblob nltk 
-
-You need to add the path to the comperio-text-analytics to your python
-
-    sys.path.append('.../comperio-text-analytics/python-client')
-
-
-To use the Lemmatizer:
-
-    from es_text_analytics.lemmatizer import OrdbankLemmatizer
-    ord = OrdbankLemmatizer()
-    ord.lemmatize("fisk", "SUBST")
-
-To use the tagger and decompounder
-
-    from es_text_analytics.tagger import NOBTagger, install_hunpos
-    from es_text_analytics.decompounder import NOBDecompounder
-
-Build models:
-
-    "comperio-text-analytics\python-client\bin\build-all-models.bat"
-
+    from es_text_analytics.tagger import install_hunpos
     install_hunpos()
-    nobtag = NOBTagger()
-    nobdec = NOBDecompounder()
-    nobdec.decompound(u"avisforside")
+    comperio-text-analytics\python-client\bin\build-all-models.bat
 
-lemmatize a list of tokenized words
 
-    [ord.lemmatize(w) for w in tok.tokenize(u"jeg er en fisker med fiskebåter")] 
-
-decompound a list of words
-
-    [nobdec.decompound(w) for w in tok.tokenize(u"smultringmesterpakklagerassistenten har ansvaret for mediadekningen")] 
